@@ -50,7 +50,7 @@ const model: ProcessModel = {
 const xml = await convert(model);
 ```
 
-### OUTPUT
+## OUTPUT
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
