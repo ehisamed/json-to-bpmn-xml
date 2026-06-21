@@ -24,7 +24,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/json-to-bpmn-xml.git"
+    "url": "git+https://github.com/ehisamed/json-to-bpmn-xml.git"
   },
   "dependencies": {
     "bpmn-moddle": "^10.0.0",
