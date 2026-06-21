@@ -1,0 +1,42 @@
+{
+  "name": "json-to-bpmn-xml",
+  "version": "1.0.0",
+  "description": "JSON to BPMN XML converter",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "keywords": [
+    "bpmn",
+    "xml",
+    "converter",
+    "json"
+  ],
+  "author": "Samedov Etibar",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/json-to-bpmn-xml.git"
+  },
+  "dependencies": {
+    "bpmn-moddle": "^10.0.0",
+    "dagre": "^0.8.5",
+    "elkjs": "^0.11.1",
+    "xml-formatter": "^3.7.0"
+  },
+  "devDependencies": {
+    "@types/bpmn-moddle": "^10.0.0",
+    "@types/node": "^26.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
