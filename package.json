@@ -30,6 +30,7 @@
     "bpmn-moddle": "^10.0.0",
     "dagre": "^0.8.5",
     "elkjs": "^0.11.1",
+    "json-to-bpmn-xml": "^1.0.0",
     "xml-formatter": "^3.7.0"
   },
   "devDependencies": {
