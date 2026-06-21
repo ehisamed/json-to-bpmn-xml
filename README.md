@@ -93,6 +93,8 @@ const xml = await convert(model);
 </bpmn:definitions>
 ```
 
+<img src="./assets/readme-example.svg" />
+
 ## ProcessModel
 
 ```typescript
