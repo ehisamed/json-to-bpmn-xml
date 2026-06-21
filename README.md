@@ -11,6 +11,14 @@ Convert JSON workflow definitions into BPMN 2.0 XML.
 - TypeScript support
 - ESM module
 
+## Supported Node Types 
+
+- start → Start Event
+- end → End Event
+- userTask → User Task
+- serviceTask → Service Task
+- exclusiveGateway → Exclusive Gateway
+
 ## Installation
 
 ```bash
