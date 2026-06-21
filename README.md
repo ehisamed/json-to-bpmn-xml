@@ -19,6 +19,8 @@ Convert JSON workflow definitions into BPMN 2.0 XML.
 - serviceTask → Service Task
 - exclusiveGateway → Exclusive Gateway
 
+**Note**: This list is not final. Additional BPMN node types are planned and will be added in future releases.
+
 ## Installation
 
 ```bash
