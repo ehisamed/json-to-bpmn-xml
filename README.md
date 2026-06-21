@@ -1,6 +1,7 @@
 # json-to-bpmn-xml
 
-[![npm version](https://img.shields.io/npm/v/json-to-bpmn-xml.svg)](https://www.npmjs.com/package/json-to-bpmn-xml)
+[![npm version](https://img.shields.io/npm/v/json-to-bpmn-xml.svg)](https://www.npmjs.com/package/json-to-bpmn-xml) ![status](https://img.shields.io/badge/status-active%20development-yellow)
+![build](https://img.shields.io/badge/build-passing-brightgreen)
 
 Convert JSON workflow definitions into BPMN 2.0 XML.
 
