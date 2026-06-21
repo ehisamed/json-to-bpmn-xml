@@ -4,14 +4,15 @@ export class DefinitionsBuilder {
   constructor(private moddle: BPMNModdle) {}
 
   build(process: any) {
-    return this.moddle.create("bpmn:Definitions", {
+    const definitions = this.moddle.create("bpmn:Definitions", {
       id: `${process.id}_definitions`,
-      targetNamespace: "http://bpmn.io/schema/bpmn",
+      targetNamespace: "http://www.omg.org/spec/BPMN/20100524/MODEL",
       rootElements: [process],
-      $attrs: {
-        "xsi:schemaLocation":
-          "http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd",
-      },
     });
+
+    definitions.$attrs!["xsi:schemaLocation"] =
+      "http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd";
+
+    return definitions;
   }
 }

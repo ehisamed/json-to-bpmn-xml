@@ -11,7 +11,7 @@ Convert JSON workflow definitions into BPMN 2.0 XML.
 - TypeScript support
 - ESM module
 
-## Supported Node Types 
+## Supported Node Types
 
 - start → Start Event
 - end → End Event
@@ -53,7 +53,7 @@ const xml = await convert(model);
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="process_1_definitions" targetNamespace="http://bpmn.io/schema/bpmn" $attrs="[object Object]">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="process_1_definitions" targetNamespace="http://www.omg.org/spec/BPMN/20100524/MODEL" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd">
   <bpmn:process id="process_1" name="Simple Process" isExecutable="false">
     <bpmn:startEvent id="start">
       <bpmn:outgoing>e1</bpmn:outgoing>
