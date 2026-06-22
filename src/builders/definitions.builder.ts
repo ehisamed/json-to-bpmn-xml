@@ -9,12 +9,9 @@ export class DefinitionsBuilder {
 
     const definitions = this.moddle.create("bpmn:Definitions", {
       id: `${process.id}_definitions`,
-      targetNamespace: "http://www.omg.org/spec/BPMN/20100524/MODEL",
+      targetNamespace: "http://bpmn.io/schema/bpmn",
       rootElements,
     });
-
-    definitions.$attrs!["xsi:schemaLocation"] =
-      "http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd";
 
     return definitions;
   }

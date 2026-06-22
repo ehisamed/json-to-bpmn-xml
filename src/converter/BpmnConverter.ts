@@ -45,7 +45,7 @@ export class BpmnConverter {
     const definitions = this.definitionsBuilder.build(process, collaboration);
 
     definitions.diagrams = [
-      await this.diagramBuilder.build(collaboration, process, elements, flowMeta, model.lanes),
+      await this.diagramBuilder.build(collaboration, process, elements, flowMeta, model.lanes ?? []),
     ];
 
     const { xml } = await this.moddle.toXML(definitions);
