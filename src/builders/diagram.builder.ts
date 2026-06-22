@@ -24,7 +24,13 @@ function getBounds(type: string) {
 export class DiagramBuilder {
   constructor(private moddle: BPMNModdle) {}
 
-  async build(process: any, elements: any[], flows: FlowMeta[]) {
+  async build(
+    collaboration: any,
+    process: any,
+    elements: any[],
+    flows: FlowMeta[],
+    lanes: any[],
+  ) {
     const nodes = elements.map((el) => {
       const bounds = getBounds(el.$type);
 
@@ -43,7 +49,10 @@ export class DiagramBuilder {
       flow: flow.flow,
     }));
 
-    const layout = await layoutGraph(nodes, edges);
+    const layout = await layoutGraph(
+      nodes,
+      edges,
+    );
 
     const nodeMap = new Map(
       (layout.children ?? [])
@@ -67,6 +76,66 @@ export class DiagramBuilder {
           id: `${element.id}_di`,
           bpmnElement: element,
           bounds: this.moddle.create("dc:Bounds", bounds),
+        });
+      })
+      .filter(Boolean);
+
+    const participant = collaboration.participants?.[0];
+
+    const participantShape = participant
+      ? this.moddle.create("bpmndi:BPMNShape", {
+          id: `${participant.id}_di`,
+          bpmnElement: participant,
+          isHorizontal: true,
+          bounds: this.moddle.create("dc:Bounds", {
+            x: 150,
+            y: 80,
+            width: 1000,
+            height: 380,
+          }),
+        })
+      : null;
+
+    const laneShapes = (lanes ?? [])
+      .map((lane: any) => {
+        const laneNodePositions = lane.nodeIds
+          .map((nodeId: string) => nodeMap.get(String(nodeId)))
+          .filter(Boolean);
+
+        if (laneNodePositions.length === 0) return null;
+
+        const minX = Math.min(
+          ...laneNodePositions.map((pos: any) => Number(pos.x ?? 0)),
+        );
+        const minY = Math.min(
+          ...laneNodePositions.map((pos: any) => Number(pos.y ?? 0)),
+        );
+        const maxX = Math.max(
+          ...laneNodePositions.map(
+            (pos: any) =>
+              Number(pos.x ?? 0) + Number(pos.width ?? NODE_SIZE.default.width),
+          ),
+        );
+        const maxY = Math.max(
+          ...laneNodePositions.map(
+            (pos: any) =>
+              Number(pos.y ?? 0) +
+              Number(pos.height ?? NODE_SIZE.default.height),
+          ),
+        );
+
+        const padding = 20;
+
+        return this.moddle.create("bpmndi:BPMNShape", {
+          id: `${lane.id}_di`,
+          bpmnElement: lane,
+          isHorizontal: true,
+          bounds: this.moddle.create("dc:Bounds", {
+            x: minX - padding,
+            y: minY - padding,
+            width: maxX - minX + padding * 2,
+            height: maxY - minY + padding * 2,
+          }),
         });
       })
       .filter(Boolean);
@@ -125,8 +194,13 @@ export class DiagramBuilder {
 
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
-      bpmnElement: process,
-      planeElement: [...shapes, ...edgeWaypoints],
+      bpmnElement: collaboration,
+      planeElement: [
+        ...(participantShape ? [participantShape] : []),
+        ...laneShapes,
+        ...shapes,
+        ...edgeWaypoints,
+      ],
     });
 
     return this.moddle.create("bpmndi:BPMNDiagram", {

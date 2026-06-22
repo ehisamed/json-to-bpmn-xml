@@ -31,17 +31,21 @@ export class BpmnConverter {
 
     const flows = this.buildFlows(model, elementById);
     const flowMeta = this.buildFlowMeta(model, flows);
+    const laneSets = this.buildLaneSets(model, elementById);
 
     const process = this.processBuilder.build(
       model.id,
       model.name,
       elements,
       flows,
+      laneSets,
     );
 
-    const definitions = this.definitionsBuilder.build(process);
+    const collaboration = this.buildCollaboration(process);
+    const definitions = this.definitionsBuilder.build(process, collaboration);
+
     definitions.diagrams = [
-      await this.diagramBuilder.build(process, elements, flowMeta),
+      await this.diagramBuilder.build(collaboration, process, elements, flowMeta, model.lanes),
     ];
 
     const { xml } = await this.moddle.toXML(definitions);
@@ -68,6 +72,45 @@ export class BpmnConverter {
     return model.edges.map((edge, index) =>
       this.flowBuilder.buildMeta(edge, flows[index], index),
     );
+  }
+
+  private buildLaneSets(
+    model: ProcessModel,
+    elementById: Map<string, FlowNode>,
+  ) {
+    if (!model.lanes?.length) return [];
+
+    const lanes = model.lanes.map((lane) => {
+      const flowNodeRef = lane.nodeIds
+        .map((nodeId) => elementById.get(String(nodeId)))
+        .filter(Boolean);
+
+      return this.moddle.create("bpmn:Lane", {
+        id: lane.id,
+        name: lane.name,
+        flowNodeRef,
+      });
+    });
+
+    return [
+      this.moddle.create("bpmn:LaneSet", {
+        id: "LaneSet_1",
+        lanes,
+      }),
+    ];
+  }
+
+  private buildCollaboration(process: any) {
+    const participant = this.moddle.create("bpmn:Participant", {
+      id: `Participant_${process.id}`,
+      name: "",
+      processRef: process,
+    });
+
+    return this.moddle.create("bpmn:Collaboration", {
+      id: `Collab_${process.id}`,
+      participants: [participant],
+    });
   }
 
   private normalizeXml(xml: string) {

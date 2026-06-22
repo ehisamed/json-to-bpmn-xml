@@ -1,4 +1,4 @@
-import { NodeType } from "../types/Node";
+import { NodeType } from "../types/node";
 
 export const NODE_MAP: Record<NodeType, string> = {
   start: "bpmn:StartEvent",
