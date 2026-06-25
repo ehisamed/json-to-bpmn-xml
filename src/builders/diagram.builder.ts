@@ -10,14 +10,9 @@ const NODE_SIZE = {
 };
 
 function getBounds(type: string) {
-  if (type === "bpmn:StartEvent" || type === "bpmn:EndEvent") {
+  if (type === "bpmn:StartEvent" || type === "bpmn:EndEvent")
     return NODE_SIZE.start;
-  }
-
-  if (type.endsWith("Gateway")) {
-    return NODE_SIZE.gateway;
-  }
-
+  if (type.endsWith("Gateway")) return NODE_SIZE.gateway;
   return NODE_SIZE.default;
 }
 
@@ -31,55 +26,61 @@ export class DiagramBuilder {
     flows: FlowMeta[],
     lanes: any[],
   ) {
-    const nodes = elements.map((el) => {
-      const bounds = getBounds(el.$type);
+    const OFFSET_X = 150;
+    const OFFSET_Y = 120;
 
+    // =========================
+    // 1. ELK INPUT (ONLY NODES)
+    // =========================
+    const nodes = elements.map((el) => {
+      const b = getBounds(el.$type);
       return {
-        id: String(el.id),
-        width: bounds.width,
-        height: bounds.height,
-        bpmnElement: el,
+        id: el.id,
+        width: b.width,
+        height: b.height,
       };
     });
 
-    const edges = flows.map((flow) => ({
-      id: String(flow.id),
-      source: String(flow.source),
-      target: String(flow.target),
-      flow: flow.flow,
+    const edges = flows.map((f) => ({
+      id: f.id,
+      source: f.source,
+      target: f.target,
     }));
 
-    const layout = await layoutGraph(
-      nodes,
-      edges,
-    );
+    const layout = await layoutGraph(nodes, edges);
 
-    const nodeMap = new Map(
-      (layout.children ?? [])
-        .filter((n: any) => n && n.id)
-        .map((n: any) => [String(n.id), n]),
-    );
+    const nodeMap = new Map<string, any>();
 
-    const shapes = elements
-      .map((element) => {
-        const pos = nodeMap.get(String(element.id));
-        if (!pos) return null;
+    const walk = (n: any) => {
+      if (!n) return;
+      if (n.children) n.children.forEach(walk);
+      if (n.id) nodeMap.set(String(n.id), n);
+    };
 
-        const bounds = {
-          x: Number(pos.x ?? 0),
-          y: Number(pos.y ?? 0),
-          width: Number(pos.width ?? NODE_SIZE.default.width),
-          height: Number(pos.height ?? NODE_SIZE.default.height),
-        };
+    walk(layout);
 
-        return this.moddle.create("bpmndi:BPMNShape", {
-          id: `${element.id}_di`,
-          bpmnElement: element,
-          bounds: this.moddle.create("dc:Bounds", bounds),
-        });
-      })
-      .filter(Boolean);
+    // =========================
+    // 2. NODES SHAPES
+    // =========================
+    const shapes = elements.map((el) => {
+      const pos = nodeMap.get(el.id);
+      if (!pos) return null;
 
+      return this.moddle.create("bpmndi:BPMNShape", {
+        id: `${el.id}_di`,
+        bpmnElement: el,
+        bounds: this.moddle.create("dc:Bounds", {
+          x: pos.x + OFFSET_X,
+          y: pos.y + OFFSET_Y,
+          width: pos.width,
+          height: pos.height,
+        }),
+      });
+    }).filter(Boolean);
+
+    // =========================
+    // 3. PARTICIPANT (WRAPPER)
+    // =========================
     const participant = collaboration.participants?.[0];
 
     const participantShape = participant
@@ -88,93 +89,56 @@ export class DiagramBuilder {
           bpmnElement: participant,
           isHorizontal: true,
           bounds: this.moddle.create("dc:Bounds", {
-            x: 150,
-            y: 80,
-            width: 1000,
-            height: 380,
+            x: OFFSET_X,
+            y: OFFSET_Y,
+            width: 1200,
+            height: 600,
           }),
         })
       : null;
 
-    const laneShapes = (lanes ?? [])
-      .map((lane: any) => {
-        const laneNodePositions = lane.nodeIds
-          .map((nodeId: string) => nodeMap.get(String(nodeId)))
-          .filter(Boolean);
+    // =========================
+    // 4. LANES (FIXED STACK — NO ELK LOGIC)
+    // =========================
+    const laneHeight = 200;
 
-        if (laneNodePositions.length === 0) return null;
+    const laneShapes = lanes.map((lane: any, index: number) => {
+      return this.moddle.create("bpmndi:BPMNShape", {
+        id: `${lane.id}_di`,
+        bpmnElement: lane,
+        isHorizontal: true,
+        bounds: this.moddle.create("dc:Bounds", {
+          x: OFFSET_X,
+          y: OFFSET_Y + index * laneHeight,
+          width: 1200,
+          height: laneHeight,
+        }),
+      });
+    });
 
-        const minX = Math.min(
-          ...laneNodePositions.map((pos: any) => Number(pos.x ?? 0)),
-        );
-        const minY = Math.min(
-          ...laneNodePositions.map((pos: any) => Number(pos.y ?? 0)),
-        );
-        const maxX = Math.max(
-          ...laneNodePositions.map(
-            (pos: any) =>
-              Number(pos.x ?? 0) + Number(pos.width ?? NODE_SIZE.default.width),
-          ),
-        );
-        const maxY = Math.max(
-          ...laneNodePositions.map(
-            (pos: any) =>
-              Number(pos.y ?? 0) +
-              Number(pos.height ?? NODE_SIZE.default.height),
-          ),
-        );
+    // =========================
+    // 5. EDGES
+    // =========================
+    const flowById = new Map(flows.map((f) => [f.id, f.flow]));
 
-        const padding = 20;
-
-        return this.moddle.create("bpmndi:BPMNShape", {
-          id: `${lane.id}_di`,
-          bpmnElement: lane,
-          isHorizontal: true,
-          bounds: this.moddle.create("dc:Bounds", {
-            x: minX - padding,
-            y: minY - padding,
-            width: maxX - minX + padding * 2,
-            height: maxY - minY + padding * 2,
-          }),
-        });
-      })
-      .filter(Boolean);
-
-    const flowById = new Map(edges.map((f) => [String(f.id), f.flow]));
-
-    const edgeWaypoints = (layout.edges ?? [])
+    const edgesDi = (layout.edges ?? [])
       .map((edge: any) => {
-        if (!edge || !edge.id) return null;
+        const s = edge.sections?.[0];
+        if (!s) return null;
 
-        const section = edge.sections?.[0];
-        if (!section) return null;
-
-        const points = [
-          section.startPoint,
-          ...(section.bendPoints ?? []),
-          section.endPoint,
-        ]
-          .filter(
-            (point) =>
-              point &&
-              point.x !== undefined &&
-              point.y !== undefined &&
-              !Number.isNaN(Number(point.x)) &&
-              !Number.isNaN(Number(point.y)),
-          )
-          .map((point: any) => ({
-            x: Number(point.x),
-            y: Number(point.y),
+        const points = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]
+          .filter(Boolean)
+          .map((p: any) => ({
+            x: p.x + OFFSET_X,
+            y: p.y + OFFSET_Y,
           }));
 
-        if (points.length < 2) return null;
-
         const flow =
-          flowById.get(String(edge.id)) ??
-          edges.find(
+          flowById.get(edge.id) ??
+          flows.find(
             (f) =>
-              String(f.source) === String(edge.sources?.[0]) &&
-              String(f.target) === String(edge.targets?.[0]),
+              f.source === edge.sources?.[0] &&
+              f.target === edge.targets?.[0],
           )?.flow;
 
         if (!flow) return null;
@@ -182,16 +146,16 @@ export class DiagramBuilder {
         return this.moddle.create("bpmndi:BPMNEdge", {
           id: `${edge.id}_di`,
           bpmnElement: flow,
-          waypoint: points.map((point) =>
-            this.moddle.create("dc:Point", {
-              x: point.x,
-              y: point.y,
-            }),
+          waypoint: points.map((p) =>
+            this.moddle.create("dc:Point", p),
           ),
         });
       })
       .filter(Boolean);
 
+    // =========================
+    // 6. FINAL DIAGRAM
+    // =========================
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
       bpmnElement: collaboration,
@@ -199,7 +163,7 @@ export class DiagramBuilder {
         ...(participantShape ? [participantShape] : []),
         ...laneShapes,
         ...shapes,
-        ...edgeWaypoints,
+        ...edgesDi,
       ],
     });
 
