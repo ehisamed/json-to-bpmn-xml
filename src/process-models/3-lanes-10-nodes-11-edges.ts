@@ -1,5 +1,15 @@
-import { convert } from "src";
-import { ProcessModel } from "./types/process";
+import { convert, ProcessModel } from "src";
+
+// Flow:
+// Start → Create Order → Payment → Gateway (paid?)
+//   ├── yes → Pack Order → Deliver → End
+//   └── no  → Retry Payment → End
+//
+// lanes: 3
+// nodes: 10
+// edges: 11
+//
+// features: gateway, loop, cross-lane, serviceTask, userTask
 
 const model: ProcessModel = {
   id: "Process_Advanced_Order",
@@ -151,7 +161,6 @@ const model: ProcessModel = {
     },
   ],
 };
-
 
 const xml = await convert(model);
 console.log(xml);

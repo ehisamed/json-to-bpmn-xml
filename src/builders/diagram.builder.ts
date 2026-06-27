@@ -63,22 +63,47 @@ export class DiagramBuilder {
     walk(layout);
 
     // =========================
-    // 2. NODES SHAPES
+    // 2. LANE HEIGHTS & OFFSETS
     // =========================
-
-    const laneHeight = 200;
+    const DEFAULT_LANE_HEIGHT = 200;
 
     const laneIndexById = new Map(
       lanes.map((lane: any, index: number) => [lane.id, index]),
     );
 
+    const laneBottomsById = new Map(
+      lanes.map((lane: any) => [lane.id, [] as number[]]),
+    );
+
+    sourceNodes.forEach((node: any) => {
+      const laneId = node.laneId ?? "";
+      const pos = nodeMap.get(node.id);
+      if (!pos) return;
+
+      laneBottomsById.get(laneId)?.push(pos.y + pos.height + NODE_INSIDE_LANE_MARGIN);
+    });
+
+    const laneHeights = lanes.map((lane: any) => {
+      const bottoms = laneBottomsById.get(lane.id) ?? [];
+      return Math.max(DEFAULT_LANE_HEIGHT, ...(bottoms.length ? bottoms : [0]));
+    });
+
+    const laneOffsets = laneHeights.reduce<number[]>((offsets, _, index) => {
+      offsets[index] =
+        index === 0 ? 0 : offsets[index - 1] + laneHeights[index - 1];
+      return offsets;
+    }, []);
+
     const laneOffsetByNodeId = new Map(
-      sourceNodes.map((node) => [
+      sourceNodes.map((node: any) => [
         node.id,
-        (laneIndexById.get(node.laneId ?? "") ?? 0) * laneHeight,
+        laneOffsets[laneIndexById.get(node.laneId ?? "") ?? 0] ?? 0,
       ]),
     );
 
+    // =========================
+    // 3. NODE SHAPES
+    // =========================
     const shapes = elements
       .map((el) => {
         const pos = nodeMap.get(el.id);
@@ -100,9 +125,13 @@ export class DiagramBuilder {
       .filter(Boolean);
 
     // =========================
-    // 3. PARTICIPANT (WRAPPER)
+    // 4. PARTICIPANT (WRAPPER)
     // =========================
     const participant = collaboration.participants?.[0];
+    const totalLaneHeight =
+      laneOffsets.length > 0
+        ? laneOffsets[laneOffsets.length - 1] + laneHeights[laneHeights.length - 1]
+        : DEFAULT_LANE_HEIGHT;
 
     const participantShape = participant
       ? this.moddle.create("bpmndi:BPMNShape", {
@@ -113,15 +142,14 @@ export class DiagramBuilder {
             x: OFFSET_X,
             y: OFFSET_Y,
             width: 1200,
-            height: 600,
+            height: Math.max(600, totalLaneHeight),
           }),
         })
       : null;
 
     // =========================
-    // 4. LANES (FIXED STACK — NO ELK LOGIC)
+    // 5. LANES
     // =========================
-
     const laneShapes = lanes.map((lane: any, index: number) => {
       return this.moddle.create("bpmndi:BPMNShape", {
         id: `${lane.id}_di`,
@@ -129,15 +157,15 @@ export class DiagramBuilder {
         isHorizontal: true,
         bounds: this.moddle.create("dc:Bounds", {
           x: OFFSET_X,
-          y: OFFSET_Y + index * laneHeight,
+          y: OFFSET_Y + laneOffsets[index],
           width: 1200,
-          height: laneHeight,
+          height: laneHeights[index],
         }),
       });
     });
 
     // =========================
-    // 5. EDGES
+    // 6. EDGES
     // =========================
     const flowById = new Map(flows.map((f) => [f.id, f.flow]));
 
@@ -158,8 +186,8 @@ export class DiagramBuilder {
               index === 0
                 ? sourceOffset
                 : index === array.length - 1
-                  ? targetOffset
-                  : sourceOffset;
+                ? targetOffset
+                : sourceOffset;
 
             return {
               x: p.x + OFFSET_X + NODE_INSIDE_LANE_MARGIN,
@@ -171,7 +199,8 @@ export class DiagramBuilder {
           flowById.get(edge.id) ??
           flows.find(
             (f) =>
-              f.source === edge.sources?.[0] && f.target === edge.targets?.[0],
+              f.source === edge.sources?.[0] &&
+              f.target === edge.targets?.[0],
           )?.flow;
 
         if (!flow) return null;
@@ -185,7 +214,7 @@ export class DiagramBuilder {
       .filter(Boolean);
 
     // =========================
-    // 6. FINAL DIAGRAM
+    // 7. FINAL DIAGRAM
     // =========================
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
