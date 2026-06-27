@@ -1,5 +1,13 @@
-import { convert } from "src";
-import { ProcessModel } from "./types/process";
+import { convert, ProcessModel } from "src";
+
+// Flow: Start → User Task → Service Task → Exclusive Gateway → Service Task → End
+// Пользователь → Система → Внешний сервис → Система
+//
+// lanes: 3
+// nodes: 6
+// edges: 5
+//
+// features: userTask, serviceTask, exclusiveGateway, cross-lane flow
 
 const model: ProcessModel = {
   id: "Process_Order_Flow",

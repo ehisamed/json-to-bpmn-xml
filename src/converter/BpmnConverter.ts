@@ -45,7 +45,14 @@ export class BpmnConverter {
     const definitions = this.definitionsBuilder.build(process, collaboration);
 
     definitions.diagrams = [
-      await this.diagramBuilder.build(collaboration, process, elements, flowMeta, model.lanes ?? []),
+      await this.diagramBuilder.build(
+        collaboration,
+        process,
+        elements,
+        flowMeta,
+        model.lanes ?? [],
+        model.nodes,
+      ),
     ];
 
     const { xml } = await this.moddle.toXML(definitions);
@@ -81,8 +88,9 @@ export class BpmnConverter {
     if (!model.lanes?.length) return [];
 
     const lanes = model.lanes.map((lane) => {
-      const flowNodeRef = lane.nodeIds
-        .map((nodeId) => elementById.get(String(nodeId)))
+      const flowNodeRef = model.nodes
+        .filter((node) => node.laneId === lane.id)
+        .map((node) => elementById.get(node.id))
         .filter(Boolean);
 
       return this.moddle.create("bpmn:Lane", {

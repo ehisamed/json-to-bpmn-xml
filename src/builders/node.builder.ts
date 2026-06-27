@@ -11,6 +11,7 @@ export class NodeBuilder {
     return this.moddle.create(type, {
       id: node.id,
       name: node.name,
+      laneId: node.laneId,
     });
   }
 }

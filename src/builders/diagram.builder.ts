@@ -2,6 +2,8 @@ import type { BPMNModdle } from "bpmn-moddle";
 import { layoutGraph } from "../elk.layout";
 import type { FlowMeta } from "./flow.builder";
 
+const NODE_INSIDE_LANE_MARGIN = 40;
+
 const NODE_SIZE = {
   default: { width: 100, height: 80 },
   start: { width: 36, height: 36 },
@@ -25,6 +27,7 @@ export class DiagramBuilder {
     elements: any[],
     flows: FlowMeta[],
     lanes: any[],
+    sourceNodes: any[],
   ) {
     const OFFSET_X = 150;
     const OFFSET_Y = 120;
@@ -62,21 +65,39 @@ export class DiagramBuilder {
     // =========================
     // 2. NODES SHAPES
     // =========================
-    const shapes = elements.map((el) => {
-      const pos = nodeMap.get(el.id);
-      if (!pos) return null;
 
-      return this.moddle.create("bpmndi:BPMNShape", {
-        id: `${el.id}_di`,
-        bpmnElement: el,
-        bounds: this.moddle.create("dc:Bounds", {
-          x: pos.x + OFFSET_X,
-          y: pos.y + OFFSET_Y,
-          width: pos.width,
-          height: pos.height,
-        }),
-      });
-    }).filter(Boolean);
+    const laneHeight = 200;
+
+    const laneIndexById = new Map(
+      lanes.map((lane: any, index: number) => [lane.id, index]),
+    );
+
+    const laneOffsetByNodeId = new Map(
+      sourceNodes.map((node) => [
+        node.id,
+        (laneIndexById.get(node.laneId ?? "") ?? 0) * laneHeight,
+      ]),
+    );
+
+    const shapes = elements
+      .map((el) => {
+        const pos = nodeMap.get(el.id);
+        if (!pos) return null;
+
+        const laneOffset = laneOffsetByNodeId.get(el.id) ?? 0;
+
+        return this.moddle.create("bpmndi:BPMNShape", {
+          id: `${el.id}_di`,
+          bpmnElement: el,
+          bounds: this.moddle.create("dc:Bounds", {
+            x: pos.x + OFFSET_X + NODE_INSIDE_LANE_MARGIN,
+            y: pos.y + OFFSET_Y + laneOffset + NODE_INSIDE_LANE_MARGIN,
+            width: pos.width,
+            height: pos.height,
+          }),
+        });
+      })
+      .filter(Boolean);
 
     // =========================
     // 3. PARTICIPANT (WRAPPER)
@@ -100,7 +121,6 @@ export class DiagramBuilder {
     // =========================
     // 4. LANES (FIXED STACK — NO ELK LOGIC)
     // =========================
-    const laneHeight = 200;
 
     const laneShapes = lanes.map((lane: any, index: number) => {
       return this.moddle.create("bpmndi:BPMNShape", {
@@ -126,19 +146,32 @@ export class DiagramBuilder {
         const s = edge.sections?.[0];
         if (!s) return null;
 
+        const sourceOffset =
+          laneOffsetByNodeId.get(edge.sources?.[0] ?? "") ?? 0;
+        const targetOffset =
+          laneOffsetByNodeId.get(edge.targets?.[0] ?? "") ?? 0;
+
         const points = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]
           .filter(Boolean)
-          .map((p: any) => ({
-            x: p.x + OFFSET_X,
-            y: p.y + OFFSET_Y,
-          }));
+          .map((p: any, index: number, array: any[]) => {
+            const offset =
+              index === 0
+                ? sourceOffset
+                : index === array.length - 1
+                  ? targetOffset
+                  : sourceOffset;
+
+            return {
+              x: p.x + OFFSET_X + NODE_INSIDE_LANE_MARGIN,
+              y: p.y + OFFSET_Y + offset + NODE_INSIDE_LANE_MARGIN,
+            };
+          });
 
         const flow =
           flowById.get(edge.id) ??
           flows.find(
             (f) =>
-              f.source === edge.sources?.[0] &&
-              f.target === edge.targets?.[0],
+              f.source === edge.sources?.[0] && f.target === edge.targets?.[0],
           )?.flow;
 
         if (!flow) return null;
@@ -146,9 +179,7 @@ export class DiagramBuilder {
         return this.moddle.create("bpmndi:BPMNEdge", {
           id: `${edge.id}_di`,
           bpmnElement: flow,
-          waypoint: points.map((p) =>
-            this.moddle.create("dc:Point", p),
-          ),
+          waypoint: points.map((p) => this.moddle.create("dc:Point", p)),
         });
       })
       .filter(Boolean);

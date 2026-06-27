@@ -1,4 +1,4 @@
-import { convert, type ProcessModel } from "json-to-bpmn-xml";
+import { convert, ProcessModel } from "src";
 
 const model: ProcessModel = {
   id: "Process_Test_Lanes",
@@ -8,21 +8,25 @@ const model: ProcessModel = {
     {
       id: "Lane_1",
       name: "Пользователь",
-      nodeIds: [],
     },
     {
       id: "Lane_2",
       name: "Система",
-      nodeIds: [],
     },
     {
       id: "Lane_3",
       name: "Внешние сервисы",
-      nodeIds: [],
     },
   ],
 
-  nodes: [],
+  nodes: [
+    {
+      id: "Start_1",
+      type: "start",
+      name: "Начало",
+      laneId: "Lane_1",
+    },
+  ],
 
   edges: [],
 };

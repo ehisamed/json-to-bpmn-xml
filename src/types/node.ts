@@ -9,6 +9,7 @@ export type NodeType =
 export interface INode {
   id: string;
   type: NodeType;
-
   name?: string;
+
+  laneId?: string;
 }
