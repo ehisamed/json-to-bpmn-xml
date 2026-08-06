@@ -213,7 +213,9 @@ export function chooseSides(
   }
 
   if (dx > 0 && dy < -band) {
-    return ["top", "left"];
+    // Long upward-forward skips enter the target from the top
+    // (avoids a leftover left-dock jog into the end event).
+    return dx > 180 ? ["top", "top"] : ["top", "left"];
   }
 
   if (dx > 0) {
@@ -399,40 +401,55 @@ function avoidObstacles(
   }
 
   if (to.x >= from.x - 2) {
-    // Top clear channel, enter target from the left (avoids stacked
-    // nodes sitting above the target in the same column).
+    const topStart = {
+      x: source.x + source.width / 2,
+      y: source.y,
+    };
+    const topEnd = {
+      x: target.x + target.width / 2,
+      y: target.y,
+    };
+    const bottomStart = {
+      x: source.x + source.width / 2,
+      y: source.y + source.height,
+    };
+    const bottomEnd = {
+      x: target.x + target.width / 2,
+      y: target.y + target.height,
+    };
+
+    // Prefer re-docking on top/bottom so clear-channel routes stay
+    // clean (no stub into a side dock after the vertical drop).
     candidates.push(
       dedupePoints([
-        from,
-        { x: from.x, y: topClearY },
-        { x: target.x - CHANNEL_GAP, y: topClearY },
-        { x: target.x - CHANNEL_GAP, y: to.y },
-        to,
+        topStart,
+        { x: topStart.x, y: topClearY },
+        { x: topEnd.x, y: topClearY },
+        topEnd,
       ]),
     );
     candidates.push(
       dedupePoints([
         from,
         { x: from.x, y: topClearY },
-        { x: to.x, y: topClearY },
-        to,
+        { x: topEnd.x, y: topClearY },
+        topEnd,
+      ]),
+    );
+    candidates.push(
+      dedupePoints([
+        bottomStart,
+        { x: bottomStart.x, y: bottomClearY },
+        { x: bottomEnd.x, y: bottomClearY },
+        bottomEnd,
       ]),
     );
     candidates.push(
       dedupePoints([
         from,
         { x: from.x, y: bottomClearY },
-        { x: target.x - CHANNEL_GAP, y: bottomClearY },
-        { x: target.x - CHANNEL_GAP, y: to.y },
-        to,
-      ]),
-    );
-    candidates.push(
-      dedupePoints([
-        from,
-        { x: from.x, y: bottomClearY },
-        { x: to.x, y: bottomClearY },
-        to,
+        { x: bottomEnd.x, y: bottomClearY },
+        bottomEnd,
       ]),
     );
   }

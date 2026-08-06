@@ -940,8 +940,15 @@ export class DiagramBuilder {
       }
 
       const pad = NODE_IN_LANE_PADDING_Y;
-      if (minY < laneTop + pad) {
-        const shift = laneTop + pad - minY;
+      // Skip-edge channel reserve only when the lane has an event-based
+      // gateway cluster (timer/end sit near the top of the lane).
+      const needsChannelReserve = ids.some((id) => {
+        const n = sourceNodes.find((sn) => sn.id === id);
+        return n?.type === "eventBasedGateway";
+      });
+      const topReserve = needsChannelReserve ? 52 : 0;
+      if (minY < laneTop + pad + topReserve) {
+        const shift = laneTop + pad + topReserve - minY;
         for (const id of ids) {
           const b = positions.get(id)!;
           positions.set(id, { ...b, y: b.y + shift });
