@@ -1,6 +1,8 @@
 node_modules/
 dist/
 
+.ai/
+
 .env
 .env.*.local
 

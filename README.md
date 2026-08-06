@@ -8,6 +8,11 @@ Convert JSON workflow definitions into **valid, formatted BPMN 2.0 XML** with di
 
 The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda Modeler: process semantics, swimlanes, and orthogonal sequence flows.
 
+**JSON structure reference (full rules, nesting, types):**
+
+- English: [docs/json-schema.en.md](./docs/json-schema.en.md)
+- Русский: [docs/json-schema.ru.md](./docs/json-schema.ru.md)
+
 <img src="./assets/advanced-order-process.png" alt="Advanced Order Process with lanes" width="100%" />
 
 ## Features
@@ -171,6 +176,9 @@ import type {
 ## ProcessModel
 
 Supports **simple** (one process) and **collaboration** (many pools) shapes.
+
+> Full field-by-field rules, nesting, validation, and examples:  
+> **[English](./docs/json-schema.en.md)** · **[Русский](./docs/json-schema.ru.md)**
 
 ```typescript
 type ProcessModel = {
