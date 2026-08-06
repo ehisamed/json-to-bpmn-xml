@@ -28,6 +28,7 @@ const DEFAULT_POOL_HEIGHT = 200;
 const CONTENT_PADDING = 60;
 const BRANCH_GAP = 24;
 const COLUMN_X_TOLERANCE = 60;
+const LAYER_GAP = 110;
 
 function getBoundsForType(type: string): { width: number; height: number } {
   if (
@@ -623,6 +624,12 @@ export class DiagramBuilder {
       }
 
       this.alignCrossLaneDrops(positions, flows, sourceNodes);
+      this.spreadExclusiveGatewayFanOut(
+        positions,
+        flows,
+        sourceNodes,
+        sourceLanes,
+      );
       this.arrangeEventBasedClusters(positions, flows, sourceNodes);
       this.resolveOverlaps(positions);
       this.refitLanesAfterRearrange(
@@ -633,6 +640,14 @@ export class DiagramBuilder {
         laneHeights,
         laneOffsets,
         laneIndexById,
+      );
+      this.centerLaneContents(
+        positions,
+        sourceLanes,
+        sourceNodes,
+        originY,
+        laneHeights,
+        laneOffsets,
       );
 
       // Recompute lane heights from final node extents.
@@ -654,6 +669,16 @@ export class DiagramBuilder {
           laneHeights[index] ?? DEFAULT_LANE_HEIGHT,
           maxBottomByLane.get(lane.id) ?? 0,
         ),
+      );
+
+      // Re-center after final height growth (e.g. Payment forcing Service taller).
+      this.centerLaneContents(
+        positions,
+        sourceLanes,
+        sourceNodes,
+        originY,
+        laneHeights,
+        laneOffsets,
       );
 
       const contentHeight = laneHeights.reduce((a, b) => a + b, 0);
@@ -783,7 +808,8 @@ export class DiagramBuilder {
         ...outs.map((o) => o.id),
       ]);
 
-      // Failure end: same X as Rejected, same Y as Timer (reference layout).
+      // Failure end: Y with Timer. Prefer Rejected X, but if an early exclusive
+      // "No" also sinks here, pull X left toward that gateway to shorten the skip.
       if (timer) {
         const endId = flows
           .filter((f) => f.source === timer.id)
@@ -793,10 +819,24 @@ export class DiagramBuilder {
           const endB = positions.get(endId)!;
           const timerB = positions.get(timer.id)!;
           const rejectedB = rejected ? positions.get(rejected.id) : null;
+          let endX = rejectedB
+            ? rejectedB.x
+            : timerB.x + timerB.width + SIDE_GAP;
+
+          const earlyExclusive = flows
+            .filter((f) => f.target === endId)
+            .map((f) => nodeById.get(f.source))
+            .find((n) => n?.type === "exclusiveGateway");
+          if (earlyExclusive) {
+            const egw = positions.get(earlyExclusive.id);
+            if (egw) {
+              const pulled = egw.x + egw.width + SIDE_GAP * 2;
+              endX = Math.round(Math.min(endX, Math.max(pulled, timerB.x)));
+            }
+          }
+
           positions.set(endId, {
-            x: Math.round(
-              rejectedB ? rejectedB.x : timerB.x + timerB.width + SIDE_GAP,
-            ),
+            x: Math.round(endX),
             y: Math.round(timerB.y),
             width: endB.width,
             height: endB.height,
@@ -869,6 +909,144 @@ export class DiagramBuilder {
         ...tb,
         x: Math.round(scx - tb.width / 2),
       });
+    }
+  }
+
+  /**
+   * Exclusive gateway fan-out that ELK stacked in one column: keep the
+   * same-lane forward target on the spine, shift cross-lane branch(es)
+   * one layer to the right (Retry vs Pack).
+   */
+  private spreadExclusiveGatewayFanOut(
+    positions: Map<string, Bounds>,
+    flows: FlowMeta[],
+    sourceNodes: INode[],
+    sourceLanes: ILane[],
+  ) {
+    const nodeById = new Map(sourceNodes.map((n) => [n.id, n]));
+    const laneIndex = new Map(sourceLanes.map((l, i) => [l.id, i]));
+
+    for (const node of sourceNodes) {
+      if (node.type !== "exclusiveGateway") continue;
+      const gw = positions.get(node.id);
+      if (!gw) continue;
+      const gwLane = node.laneId ?? sourceLanes[0]?.id;
+      const gwLaneIdx = laneIndex.get(gwLane ?? "") ?? 0;
+
+      const outs = flows
+        .filter((f) => f.source === node.id)
+        .map((f) => {
+          const t = nodeById.get(f.target);
+          const b = positions.get(f.target);
+          if (!t || !b) return null;
+          const tLaneIdx = laneIndex.get(t.laneId ?? gwLane ?? "") ?? gwLaneIdx;
+          return { id: f.target, node: t, bounds: b, laneIdx: tLaneIdx };
+        })
+        .filter((o): o is NonNullable<typeof o> => o !== null);
+
+      if (outs.length < 2) continue;
+
+      // Cluster outs that share roughly the same X (ELK same layer).
+      const clusters: (typeof outs)[] = [];
+      const sorted = [...outs].sort((a, b) => a.bounds.x - b.bounds.x);
+      for (const o of sorted) {
+        const last = clusters[clusters.length - 1];
+        if (
+          last &&
+          Math.abs(o.bounds.x - last[0]!.bounds.x) <= COLUMN_X_TOLERANCE
+        ) {
+          last.push(o);
+        } else {
+          clusters.push([o]);
+        }
+      }
+
+      for (const cluster of clusters) {
+        if (cluster.length < 2) continue;
+        const forwardSameLane = cluster.filter(
+          (o) => o.laneIdx === gwLaneIdx,
+        );
+        const crossLane = cluster.filter((o) => o.laneIdx !== gwLaneIdx);
+        if (!forwardSameLane.length || !crossLane.length) continue;
+
+        // Keep same-lane targets; push cross-lane branches rightward.
+        crossLane.sort((a, b) => a.laneIdx - b.laneIdx);
+        crossLane.forEach((o, i) => {
+          const b = positions.get(o.id)!;
+          positions.set(o.id, {
+            ...b,
+            x: Math.round(b.x + LAYER_GAP * (i + 1)),
+          });
+        });
+      }
+    }
+  }
+
+  /**
+   * When a lane is taller than its content stack, shift the block toward
+   * the vertical center so nodes are not stuck to the lane ceiling
+   * (e.g. Deliver under Pack at the System|Service border).
+   *
+   * Also: if the lane has vertically stacked content, keep a larger top
+   * inset so the uppermost node is not flush with the lane divider.
+   */
+  private centerLaneContents(
+    positions: Map<string, Bounds>,
+    sourceLanes: ILane[],
+    sourceNodes: INode[],
+    originY: number,
+    laneHeights: number[],
+    laneOffsets: number[],
+  ) {
+    const EXTRA_CEILING = 28;
+
+    for (let index = 0; index < sourceLanes.length; index++) {
+      const lane = sourceLanes[index]!;
+      const laneTop = originY + (laneOffsets[index] ?? 0);
+      const laneH = laneHeights[index] ?? DEFAULT_LANE_HEIGHT;
+      const ids = [...positions.keys()].filter((id) => {
+        const n = sourceNodes.find((sn) => sn.id === id);
+        return (n?.laneId ?? sourceLanes[0]!.id) === lane.id;
+      });
+      if (!ids.length) continue;
+
+      let minY = Infinity;
+      let maxBottom = 0;
+      for (const id of ids) {
+        const b = positions.get(id)!;
+        minY = Math.min(minY, b.y);
+        maxBottom = Math.max(maxBottom, b.y + b.height);
+      }
+
+      const pad = NODE_IN_LANE_PADDING_Y;
+      const contentH = maxBottom - minY;
+      const available = laneH - pad * 2;
+      let shift = 0;
+
+      if (contentH < available - 8) {
+        const desiredTop = laneTop + pad + (available - contentH) / 2;
+        shift = desiredTop - minY;
+      } else if (
+        index > 0 &&
+        contentH > 100 &&
+        minY < laneTop + pad + EXTRA_CEILING
+      ) {
+        // Tight lane but stacked content: still lift the top node off the divider.
+        shift = laneTop + pad + EXTRA_CEILING - minY;
+        // Grow lane if needed so the bottom node keeps its padding.
+        const newBottom = maxBottom + shift;
+        const needH = newBottom - laneTop + pad;
+        if (needH > laneH) {
+          laneHeights[index] = needH;
+        }
+      }
+
+      if (Math.abs(shift) < 4) continue;
+
+      for (const id of ids) {
+        const b = positions.get(id)!;
+        positions.set(id, { ...b, y: Math.round(b.y + shift) });
+      }
     }
   }
 

@@ -378,6 +378,13 @@ npm run build
 | `incidentResponse` | `incident-response.ts` | **Complex**: Support Desk + Operations collaboration |
 | `processPayable` | `process-payable.ts` | Simplified single-pool payable slice |
 | `schedulePayments` | `schedule-payments.ts` | Simplified schedule-payments slice |
+| `exclusiveFanoutUpForward` | `exclusive-fanout-up-forward.ts` | Exclusive GW fan-out (up + forward) |
+| `crossLaneSparseDrop` | `cross-lane-sparse-drop.ts` | Sparse cross-lane drop layout |
+| `parallelSplitJoin` | `parallel-split-join.ts` | Parallel split / join |
+| `exclusiveThreeWay` | `exclusive-three-way.ts` | Three-way exclusive with labels |
+| `timerStartSimple` | `timer-start-simple.ts` | Timer start |
+| `messageStartSimple` | `message-start-simple.ts` | Message start |
+| `subprocessAndMultiInstance` | `subprocess-and-multi-instance.ts` | Collapsed subProcess + multi-instance |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store.
 

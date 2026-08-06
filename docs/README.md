@@ -73,6 +73,13 @@ Reusable `ProcessModel` samples under [`fixtures/models/`](../fixtures/models/):
 | `incidentResponse` | `incident-response.ts` | Collaboration: Support Desk + Operations |
 | `processPayable` | `process-payable.ts` | Single-pool payable slice |
 | `schedulePayments` | `schedule-payments.ts` | Schedule-payments slice |
+| `exclusiveFanoutUpForward` | `exclusive-fanout-up-forward.ts` | Exclusive GW: up-lane + forward |
+| `crossLaneSparseDrop` | `cross-lane-sparse-drop.ts` | Sparse Service lane (Deliver vs Charge) |
+| `parallelSplitJoin` | `parallel-split-join.ts` | Parallel split/join |
+| `exclusiveThreeWay` | `exclusive-three-way.ts` | Three-way exclusive + labels |
+| `timerStartSimple` | `timer-start-simple.ts` | Timer start event |
+| `messageStartSimple` | `message-start-simple.ts` | Message start event |
+| `subprocessAndMultiInstance` | `subprocess-and-multi-instance.ts` | Collapsed subProcess + MI |
 
 Import from the barrel:
 

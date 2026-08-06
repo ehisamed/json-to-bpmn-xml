@@ -66,6 +66,14 @@ describe("advancedOrder layout regression", () => {
     expect(delivery.x).toBeLessThan(notify.x);
     expect(notify.x).toBeLessThan(success.x);
 
+    // Exclusive fan-out: Retry (up-lane) must not share Pack's column.
+    expect(Math.abs(retry.x - pack.x)).toBeGreaterThan(40);
+
+    // Deliver should not stick to the External Service lane ceiling
+    // (System lane ends around Pack bottom; leave a visible gap).
+    const packBottom = pack.y + pack.height;
+    expect(delivery.y - packBottom).toBeGreaterThan(24);
+
     // Payment must not sit under Create (merge target of the retry loop).
     expect(Math.abs(payment.x - create.x)).toBeGreaterThan(40);
 

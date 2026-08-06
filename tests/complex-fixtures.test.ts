@@ -3,6 +3,13 @@ import {
   accountsPayable,
   incidentResponse,
   advancedOrder,
+  exclusiveFanoutUpForward,
+  parallelSplitJoin,
+  exclusiveThreeWay,
+  timerStartSimple,
+  messageStartSimple,
+  subprocessAndMultiInstance,
+  crossLaneSparseDrop,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -10,6 +17,16 @@ const complexFixtures = [
   { name: "accountsPayable", model: accountsPayable },
   { name: "incidentResponse", model: incidentResponse },
   { name: "advancedOrder", model: advancedOrder },
+] as const;
+
+const layoutFixtures = [
+  { name: "exclusiveFanoutUpForward", model: exclusiveFanoutUpForward },
+  { name: "parallelSplitJoin", model: parallelSplitJoin },
+  { name: "exclusiveThreeWay", model: exclusiveThreeWay },
+  { name: "timerStartSimple", model: timerStartSimple },
+  { name: "messageStartSimple", model: messageStartSimple },
+  { name: "subprocessAndMultiInstance", model: subprocessAndMultiInstance },
+  { name: "crossLaneSparseDrop", model: crossLaneSparseDrop },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -36,5 +53,41 @@ describe("complex fixtures", () => {
     expect(xml).toContain('name="Support Desk"');
     expect(xml).toContain('name="Operations"');
     expect(xml).toContain("<bpmn:timerEventDefinition");
+  });
+});
+
+describe("layout case fixtures", () => {
+  for (const { name, model } of layoutFixtures) {
+    it(`converts ${name}`, async () => {
+      const xml = await convert(model);
+      expect(xml).toContain("<bpmndi:BPMNDiagram");
+      expect(xml).not.toContain("laneId=");
+    });
+  }
+
+  it("exclusiveFanout spreads Retry away from Continue column", async () => {
+    const xml = await convert(exclusiveFanoutUpForward);
+    const retry = xml.match(
+      /bpmnElement="Task_Retry"[\s\S]*?<dc:Bounds x="([^"]+)"/,
+    );
+    const cont = xml.match(
+      /bpmnElement="Task_Continue"[\s\S]*?<dc:Bounds x="([^"]+)"/,
+    );
+    expect(retry).toBeTruthy();
+    expect(cont).toBeTruthy();
+    expect(Math.abs(Number(retry![1]) - Number(cont![1]))).toBeGreaterThan(40);
+  });
+
+  it("timer and message starts emit event definitions", async () => {
+    const timerXml = await convert(timerStartSimple);
+    const msgXml = await convert(messageStartSimple);
+    expect(timerXml).toContain("<bpmn:timerEventDefinition");
+    expect(msgXml).toContain("<bpmn:messageEventDefinition");
+  });
+
+  it("subprocess and multi-instance markers are present", async () => {
+    const xml = await convert(subprocessAndMultiInstance);
+    expect(xml).toContain("<bpmn:subProcess");
+    expect(xml).toContain("<bpmn:multiInstanceLoopCharacteristics");
   });
 });
