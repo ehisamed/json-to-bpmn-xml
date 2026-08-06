@@ -46,5 +46,5 @@ Node types: `start | end | userTask | serviceTask | exclusiveGateway | parallelG
 - `npm run local` — advanced order process with lanes
 - `npm run example:lanes` / `example:simple`
 
-## Branch note
-Work on `lane` branch: lanes + collaboration were added on top of main.
+## Docs
+- README covers lanes, API, validation, layout, examples; screenshot in `assets/advanced-order-process.png`.
