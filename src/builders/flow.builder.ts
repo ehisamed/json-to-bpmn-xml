@@ -15,12 +15,17 @@ export class FlowBuilder {
     const source = elementById.get(String(edge.source));
     const target = elementById.get(String(edge.target));
 
-    const flow = this.moddle.create("bpmn:SequenceFlow", {
+    const attrs: Record<string, unknown> = {
       id: edge.id ?? `Flow_${index + 1}`,
-      name: edge.name,
       sourceRef: source,
       targetRef: target,
-    });
+    };
+
+    if (edge.name !== undefined) {
+      attrs.name = edge.name;
+    }
+
+    const flow = this.moddle.create("bpmn:SequenceFlow", attrs);
 
     if (source) {
       source.outgoing = [...(source.outgoing ?? []), flow];
@@ -40,5 +45,26 @@ export class FlowBuilder {
       target: String(edge.target),
       flow,
     };
+  }
+
+  buildMessageFlow(
+    edge: { id?: string; source: string; target: string; name?: string },
+    elementById: Map<string, FlowNode>,
+    index: number,
+  ) {
+    const source = elementById.get(String(edge.source));
+    const target = elementById.get(String(edge.target));
+
+    const attrs: Record<string, unknown> = {
+      id: edge.id ?? `MessageFlow_${index + 1}`,
+      sourceRef: source,
+      targetRef: target,
+    };
+
+    if (edge.name !== undefined) {
+      attrs.name = edge.name;
+    }
+
+    return this.moddle.create("bpmn:MessageFlow", attrs);
   }
 }

@@ -5,33 +5,31 @@ const elk = new ELK();
 export async function layoutGraph(nodes: any[], edges: any[]) {
   const graph = {
     id: "root",
-
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
-
-      "elk.layered.spacing.nodeNodeBetweenLayers": "120",
-      "elk.spacing.nodeNode": "80",
-
+      "elk.spacing.nodeNode": "60",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "110",
+      "elk.layered.spacing.edgeNodeBetweenLayers": "40",
+      "elk.spacing.edgeNode": "30",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+      "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+      "elk.edgeRouting": "ORTHOGONAL",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     },
 
-    children: nodes.map((n) => ({
-      id: n.id,
-      width: n.width ?? 120,
-      height: n.height ?? 80,
+    children: nodes.map((node) => ({
+      id: node.id,
+      width: node.width,
+      height: node.height,
     })),
 
     edges: edges.map((e) => ({
       id: e.id,
       sources: [e.source],
       targets: [e.target],
-
-      junctionPoints: [],
     })),
   };
 
-  return await elk.layout(graph);
+  return elk.layout(graph);
 }

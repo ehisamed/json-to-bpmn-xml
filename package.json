@@ -1,7 +1,7 @@
 {
   "name": "json-to-bpmn-xml",
   "version": "1.0.2",
-  "description": "JSON to BPMN XML converter",
+  "description": "Convert JSON workflow definitions into BPMN 2.0 XML",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -10,14 +10,26 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "local": "npx tsx scripts/local-run.ts",
+    "preview": "npx tsx scripts/render-fixtures.ts",
+    "preview:setup": "npx puppeteer browsers install chrome",
+    "example:simple": "npx tsx examples/simple-process.ts",
+    "example:lanes": "npx tsx examples/lanes.ts",
+    "example:gateway": "npx tsx examples/exclusive-gateway.ts",
+    "example:service": "npx tsx examples/service-task.ts",
+    "example:payable": "npx tsx examples/process-payable.ts",
+    "example:schedule": "npx tsx examples/schedule-payments.ts",
+    "example:accounts": "npx tsx examples/accounts-payable.ts"
   },
   "keywords": [
     "bpmn",
     "xml",
     "converter",
-    "json"
+    "json",
+    "workflow",
+    "lanes"
   ],
   "author": "Samedov Etibar",
   "license": "Apache-2.0",
@@ -28,14 +40,13 @@
   },
   "dependencies": {
     "bpmn-moddle": "^10.0.0",
-    "dagre": "^0.8.5",
     "elkjs": "^0.11.1",
-    "json-to-bpmn-xml": "^1.0.2",
     "xml-formatter": "^3.7.0"
   },
   "devDependencies": {
     "@types/bpmn-moddle": "^10.0.0",
     "@types/node": "^26.0.0",
+    "bpmn-to-image": "^0.10.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

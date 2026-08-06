@@ -1,4 +1,4 @@
-import { convert, type ProcessModel } from "json-to-bpmn-xml";
+import { convert, type ProcessModel } from "../src/index";
 
 const model: ProcessModel = {
   id: "process_1",
@@ -6,12 +6,12 @@ const model: ProcessModel = {
   nodes: [
     { id: "start", type: "start" },
     { id: "task1", type: "userTask", name: "Do something" },
-    { id: "end", type: "end" }
+    { id: "end", type: "end" },
   ],
   edges: [
     { id: "e1", source: "start", target: "task1" },
-    { id: "e2", source: "task1", target: "end" }
-  ]
+    { id: "e2", source: "task1", target: "end" },
+  ],
 };
 
 const xml = await convert(model);
