@@ -631,6 +631,7 @@ export class DiagramBuilder {
         sourceLanes,
       );
       this.arrangeEventBasedClusters(positions, flows, sourceNodes);
+      this.ensureAdjacentEndGaps(positions, flows, sourceNodes);
       this.resolveOverlaps(positions);
       this.refitLanesAfterRearrange(
         positions,
@@ -712,6 +713,7 @@ export class DiagramBuilder {
     this.resolveOverlaps(positions);
     this.arrangeEventBasedClusters(positions, flows, sourceNodes);
     this.alignGatewayBypassTasks(positions, flows, sourceNodes);
+    this.ensureAdjacentEndGaps(positions, flows, sourceNodes);
     this.resolveOverlaps(positions);
 
     let contentWidth = 400;
@@ -830,8 +832,10 @@ export class DiagramBuilder {
           if (earlyExclusive) {
             const egw = positions.get(earlyExclusive.id);
             if (egw) {
+              // Pull toward the early No gateway; do not clamp to timer X
+              // (that blocked the shorten and kept a long skip).
               const pulled = egw.x + egw.width + SIDE_GAP * 2;
-              endX = Math.round(Math.min(endX, Math.max(pulled, timerB.x)));
+              endX = Math.round(Math.min(endX, pulled));
             }
           }
 
@@ -998,7 +1002,7 @@ export class DiagramBuilder {
     laneHeights: number[],
     laneOffsets: number[],
   ) {
-    const EXTRA_CEILING = 28;
+    const EXTRA_CEILING = 56;
 
     for (let index = 0; index < sourceLanes.length; index++) {
       const lane = sourceLanes[index]!;
@@ -1046,6 +1050,49 @@ export class DiagramBuilder {
       for (const id of ids) {
         const b = positions.get(id)!;
         positions.set(id, { ...b, y: Math.round(b.y + shift) });
+      }
+    }
+  }
+
+  /**
+   * Keep a visible gap between a task and an end event that ELK placed
+   * flush against it (Retry|Cancelled zero-length edge).
+   */
+  private ensureAdjacentEndGaps(
+    positions: Map<string, Bounds>,
+    flows: FlowMeta[],
+    sourceNodes: INode[],
+  ) {
+    const GAP = 48;
+    const nodeById = new Map(sourceNodes.map((n) => [n.id, n]));
+
+    for (const flow of flows) {
+      const s = nodeById.get(flow.source);
+      const t = nodeById.get(flow.target);
+      if (!s || !t) continue;
+      if (t.type !== "end") continue;
+      if (
+        s.type === "start" ||
+        s.type === "end" ||
+        String(s.type).includes("Gateway")
+      ) {
+        continue;
+      }
+
+      const sb = positions.get(s.id);
+      const tb = positions.get(t.id);
+      if (!sb || !tb) continue;
+
+      const gapX = tb.x - (sb.x + sb.width);
+      const overlapY =
+        Math.min(sb.y + sb.height, tb.y + tb.height) -
+        Math.max(sb.y, tb.y);
+
+      if (gapX < GAP && overlapY > 0) {
+        positions.set(t.id, {
+          ...tb,
+          x: Math.round(sb.x + sb.width + GAP),
+        });
       }
     }
   }
@@ -1326,13 +1373,16 @@ export class DiagramBuilder {
     id: string,
     bpmnElement: any,
     bounds: Bounds,
-    extra?: { isHorizontal?: boolean },
+    extra?: { isHorizontal?: boolean; isMarkerVisible?: boolean },
   ) {
     const shape = this.moddle.create("bpmndi:BPMNShape", {
       id: `${id}_di`,
       bpmnElement,
       ...(extra?.isHorizontal !== undefined
         ? { isHorizontal: extra.isHorizontal }
+        : {}),
+      ...(extra?.isMarkerVisible !== undefined
+        ? { isMarkerVisible: extra.isMarkerVisible }
         : {}),
       bounds: this.moddle.create("dc:Bounds", {
         x: Math.round(bounds.x),
@@ -1350,7 +1400,45 @@ export class DiagramBuilder {
       .map((el) => {
         const b = positions.get(String(el.id));
         if (!b) return null;
-        return this.createShape(String(el.id), el, b);
+        const extra =
+          el.$type === "bpmn:ExclusiveGateway"
+            ? { isMarkerVisible: true }
+            : undefined;
+        const shape = this.createShape(String(el.id), el, b, extra);
+        const name = typeof el.name === "string" ? el.name : "";
+        const isGateway = String(el.$type ?? "").includes("Gateway");
+        // Gateway labels sit under the diamond by default and collide with
+        // bottom exits. Emit a label shifted left; widen long names.
+        if (isGateway && name.length > 0) {
+          const labelW = Math.min(
+            240,
+            Math.max(name.length >= 14 ? 100 : 72, name.length * 7),
+          );
+          // Sit under the diamond but end left of the bottom vertex so
+          // No/Path B exits stay clear — without sliding onto the
+          // previous task (fully-left placement overlapped Approve).
+          const maxRight = b.x + b.width / 2 - 6;
+          const labelX = Math.round(maxRight - labelW);
+          shape.label = this.moddle.create("bpmndi:BPMNLabel", {
+            bounds: this.moddle.create("dc:Bounds", {
+              x: labelX,
+              y: Math.round(b.y + b.height + 2),
+              width: labelW,
+              height: name.length >= 18 ? 28 : 20,
+            }),
+          });
+        } else if (name.length >= 14) {
+          const labelW = Math.min(240, Math.max(100, name.length * 7));
+          shape.label = this.moddle.create("bpmndi:BPMNLabel", {
+            bounds: this.moddle.create("dc:Bounds", {
+              x: Math.round(b.x + b.width / 2 - labelW / 2),
+              y: Math.round(b.y + b.height + 2),
+              width: labelW,
+              height: 24,
+            }),
+          });
+        }
+        return shape;
       })
       .filter(Boolean);
   }

@@ -247,7 +247,7 @@ Edit `scripts/local-run.ts` to import any fixture from `fixtures/models`.
 
 ### Fixture PNG previews
 
-Render every fixture to `.bpmn` + framed `.png` (white background, padding, thin border). Layout/conversion is unchanged — framing is image-only.
+Render every fixture to `.bpmn` + `.png` (white padding, no artificial border). Layout/conversion is unchanged — padding is image-only.
 
 ```bash
 npm run preview:setup   # once: install Puppeteer Chrome
@@ -334,9 +334,11 @@ Diagram plane is bound to the **collaboration**. Participant and lane shapes use
 - Forward cross-lane links: side docks (`right` → `left`) or vertical drop when aligned
 - Long skip / bypass edges: clear channel above obstacles, enter target from the **top**
 - Backward loops: route around stacked nodes; approach the dock **from outside** the shape
+- **Exclusive / parallel gateways** (diamond): docks only at vertices; fan-out uses compass sides (`top` / `right` / `bottom`) instead of stacking on one face
+- **Small end events** (≤40px): several inbound flows share **one** left-center axis (same dock), so tips do not stack as separate arrowheads; mid-channels may still diverge before the merge
 - **Event-based gateway**: timer catch above, first message below, further messages to the right (compass cluster); shared failure ends stack above the side message
 - **Message flows / data associations**: bridge routing through the pool gap, avoiding data-store boxes
-- Multiple flows on the same side of a node may share that side (valid BPMN)
+- Larger nodes with several docks on one side still use spaced slots on that face
 
 Coordinates are deterministic for a given model (good for tests / snapshots). Exact numbers can change if layout constants or ELK options change.
 
@@ -385,8 +387,14 @@ npm run build
 | `timerStartSimple` | `timer-start-simple.ts` | Timer start |
 | `messageStartSimple` | `message-start-simple.ts` | Message start |
 | `subprocessAndMultiInstance` | `subprocess-and-multi-instance.ts` | Collapsed subProcess + multi-instance |
+| `gatewayFanoutJogs` | `gateway-fanout-jogs.ts` | Exclusive fan-out without detached stubs |
+| `sharedEndDualIncoming` | `shared-end-dual-incoming.ts` | Two paths → one End (shared axis) |
+| `gatewayLongLabel` | `gateway-long-label.ts` | Long gateway label placement |
+| `gatewayMultiToSameEnd` | `gateway-multi-to-same-end.ts` | Rejected/Timeout → shared End |
+| `gatewayYesNoCross` | `gateway-yes-no-cross.ts` | Yes right / No bottom on diamond |
+| `gatewayJoinBypassTop` | `gateway-join-bypass-top.ts` | Bypass over top into join |
 
-Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store.
+Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 
 Switch the model in `scripts/local-run.ts`:
 

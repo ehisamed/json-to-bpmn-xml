@@ -4,7 +4,6 @@ import type { ProcessModel } from "../../src/index";
  * Schedule Payments pool from `diagram (9).bpmn` (second participant).
  *
  * Original BPMN also includes unsupported features (omitted or approximated):
- * - timer StartEvent → plain start
  * - generic bpmn:task → serviceTask
  * - subProcess "Notify Payables" → serviceTask
  * - multiInstanceLoopCharacteristics → omitted
@@ -13,7 +12,7 @@ import type { ProcessModel } from "../../src/index";
  * - colors / bioc attributes → omitted
  *
  * Approximate flow:
- *   Start → Select Due Invoices → Overdraft?
+ *   Timer start → Select Due Invoices → Overdraft?
  *     ├── Yes → Approve Payments ─┐
  *     └── No  ────────────────────┴→ Notify Payables → End
  */
@@ -24,9 +23,9 @@ export const schedulePayments: ProcessModel = {
   nodes: [
     {
       id: "Event_TimerStart",
-      // Original: startEvent + timerEventDefinition
       type: "start",
       name: "Timer start",
+      eventDefinition: "timer",
     },
     {
       id: "Activity_SelectDue",

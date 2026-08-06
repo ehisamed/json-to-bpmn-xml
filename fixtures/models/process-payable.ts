@@ -50,7 +50,7 @@ export const processPayable: ProcessModel = {
     {
       id: "Gateway_PrelimApproved",
       type: "exclusiveGateway",
-      name: "Preliminarily Approved?",
+      name: "Prelim. approved?",
       laneId: "Lane_CFO",
     },
     {

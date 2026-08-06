@@ -24,9 +24,8 @@ import * as fixtureExports from "../fixtures/models";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PREVIEWS_ROOT = path.join(ROOT, "previews");
 
-/** White margin around the diagram in the final PNG (CSS px). */
-const FRAME_PADDING_PX = 48;
-const FRAME_BORDER_PX = 2;
+/** White margin around the diagram PNG (CSS px). No artificial border. */
+const FRAME_PADDING_PX = 56;
 
 const SYSTEM_CHROME_CANDIDATES = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -179,8 +178,8 @@ async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Wrap an already-rendered diagram PNG in a white card with padding
- * and a thin black border. Does not alter BPMN content.
+ * Pad an already-rendered diagram PNG on a white background.
+ * Does not add a fake border — only pools/lanes from BPMN keep their outlines.
  */
 async function framePngOnWhiteCard(pngPath: string): Promise<void> {
   const raw = await readFile(pngPath);
@@ -213,12 +212,6 @@ async function framePngOnWhiteCard(pngPath: string): Promise<void> {
       padding: ${FRAME_PADDING_PX}px;
       line-height: 0;
     }
-    .frame {
-      display: inline-block;
-      border: ${FRAME_BORDER_PX}px solid #000000;
-      background: #ffffff;
-      line-height: 0;
-    }
     img {
       display: block;
       max-width: none;
@@ -227,9 +220,7 @@ async function framePngOnWhiteCard(pngPath: string): Promise<void> {
 </head>
 <body>
   <div class="card">
-    <div class="frame">
-      <img id="diagram" src="${dataUrl}" alt="" />
-    </div>
+    <img id="diagram" src="${dataUrl}" alt="" />
   </div>
 </body>
 </html>`,
@@ -295,7 +286,7 @@ async function renderOne(
   );
 
   console.log(
-    `    ${ansi.dim("└─")} ${ansi.step("white frame + padding")} …`,
+    `    ${ansi.dim("└─")} ${ansi.step("white padding")} …`,
   );
   await framePngOnWhiteCard(pngPath);
 
@@ -327,7 +318,7 @@ async function main() {
     `  ${ansi.dim("output:  ")} ${ansi.path(path.relative(ROOT, outDir))}`,
   );
   console.log(
-    `  ${ansi.dim("frame:   ")} white + ${FRAME_PADDING_PX}px pad + ${FRAME_BORDER_PX}px border`,
+    `  ${ansi.dim("frame:   ")} white pad ${FRAME_PADDING_PX}px (no artificial border)`,
   );
   console.log(`  ${ansi.dim("chrome:  ")} ${ansi.path(chromePath)}`);
   console.log(`  ${ansi.dim(line())}`);

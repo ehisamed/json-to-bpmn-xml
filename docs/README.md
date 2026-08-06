@@ -13,7 +13,7 @@ Package overview, API, and quick start: [../README.md](../README.md).
 
 ## Fixture previews (PNG)
 
-Convert every model in `fixtures/models/` to BPMN XML and a framed PNG (white background, padding, thin black border). Diagram conversion/layout is unchanged — framing is applied only to the image.
+Convert every model in `fixtures/models/` to BPMN XML and a PNG with white padding. Diagram conversion/layout is unchanged — padding is applied only to the image. No artificial border is added (pool/lane outlines come from BPMN itself).
 
 ### Setup (once)
 
@@ -45,6 +45,7 @@ previews/YYYY-MM-DD_HH-mm-ss/
 - Folder name = date + time of the run
 - `previews/` is gitignored
 - Terminal shows colored step tree and a progress bar
+- PNG: white margin around the diagram; **no** fake black border (only BPMN pool/lane borders if present)
 
 ### Related scripts
 
@@ -80,6 +81,14 @@ Reusable `ProcessModel` samples under [`fixtures/models/`](../fixtures/models/):
 | `timerStartSimple` | `timer-start-simple.ts` | Timer start event |
 | `messageStartSimple` | `message-start-simple.ts` | Message start event |
 | `subprocessAndMultiInstance` | `subprocess-and-multi-instance.ts` | Collapsed subProcess + MI |
+| `gatewayFanoutJogs` | `gateway-fanout-jogs.ts` | Exclusive fan-out without detached stubs |
+| `sharedEndDualIncoming` | `shared-end-dual-incoming.ts` | Two paths → one End (shared axis) |
+| `gatewayLongLabel` | `gateway-long-label.ts` | Long gateway label placement |
+| `gatewayMultiToSameEnd` | `gateway-multi-to-same-end.ts` | Rejected/Timeout → shared End |
+| `gatewayYesNoCross` | `gateway-yes-no-cross.ts` | Yes right / No bottom on diamond |
+| `gatewayJoinBypassTop` | `gateway-join-bypass-top.ts` | Bypass over top into join |
+
+Layout / routing notes live in [../README.md](../README.md#layout-notes). Routing regressions: `tests/routing-cases.test.ts`.
 
 Import from the barrel:
 

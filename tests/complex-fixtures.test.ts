@@ -10,6 +10,12 @@ import {
   messageStartSimple,
   subprocessAndMultiInstance,
   crossLaneSparseDrop,
+  gatewayFanoutJogs,
+  sharedEndDualIncoming,
+  gatewayLongLabel,
+  gatewayMultiToSameEnd,
+  gatewayYesNoCross,
+  gatewayJoinBypassTop,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -27,6 +33,12 @@ const layoutFixtures = [
   { name: "messageStartSimple", model: messageStartSimple },
   { name: "subprocessAndMultiInstance", model: subprocessAndMultiInstance },
   { name: "crossLaneSparseDrop", model: crossLaneSparseDrop },
+  { name: "gatewayFanoutJogs", model: gatewayFanoutJogs },
+  { name: "sharedEndDualIncoming", model: sharedEndDualIncoming },
+  { name: "gatewayLongLabel", model: gatewayLongLabel },
+  { name: "gatewayMultiToSameEnd", model: gatewayMultiToSameEnd },
+  { name: "gatewayYesNoCross", model: gatewayYesNoCross },
+  { name: "gatewayJoinBypassTop", model: gatewayJoinBypassTop },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -83,6 +95,20 @@ describe("layout case fixtures", () => {
     const msgXml = await convert(messageStartSimple);
     expect(timerXml).toContain("<bpmn:timerEventDefinition");
     expect(msgXml).toContain("<bpmn:messageEventDefinition");
+  });
+
+  it("exclusive gateways expose X marker in DI", async () => {
+    const xml = await convert(exclusiveThreeWay);
+    expect(xml).toContain("<bpmn:exclusiveGateway");
+    expect(xml).toMatch(
+      /bpmnElement="GW_Decision"[^>]*isMarkerVisible="true"/,
+    );
+  });
+
+  it("schedulePayments timer start has clock definition", async () => {
+    const { schedulePayments } = await import("../fixtures/models");
+    const xml = await convert(schedulePayments);
+    expect(xml).toContain("<bpmn:timerEventDefinition");
   });
 
   it("subprocess and multi-instance markers are present", async () => {

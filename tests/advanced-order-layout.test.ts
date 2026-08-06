@@ -72,7 +72,11 @@ describe("advancedOrder layout regression", () => {
     // Deliver should not stick to the External Service lane ceiling
     // (System lane ends around Pack bottom; leave a visible gap).
     const packBottom = pack.y + pack.height;
-    expect(delivery.y - packBottom).toBeGreaterThan(24);
+    expect(delivery.y - packBottom).toBeGreaterThan(40);
+
+    // Cancelled must not be flush against Retry (zero-length edge).
+    const cancelled = bounds.get("End_Failed")!;
+    expect(cancelled.x - (retry.x + retry.width)).toBeGreaterThanOrEqual(40);
 
     // Payment must not sit under Create (merge target of the retry loop).
     expect(Math.abs(payment.x - create.x)).toBeGreaterThan(40);
