@@ -20,6 +20,7 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores** + data input/output associations
 - **Auto layout** (ELK + orthogonal edge routing, including event-gateway “compass” clusters)
+- **DI colors** (`bioc` + `color` extensions, as in bpmn.io)
 - **Validation** of the input model
 - **TypeScript** types + **ESM**
 
@@ -161,6 +162,7 @@ import type {
   ILane,
   IMessageFlow,
   IDataStore,
+  DiColor,
   NodeType,
   EventDefinition,
 } from "json-to-bpmn-xml";
@@ -203,8 +205,27 @@ type INode = {
   multiInstance?: boolean | { sequential?: boolean };
   dataInputs?: string[];  // data store ids
   dataOutputs?: string[]; // data store ids
+  /** bpmn.io bioc + OMG color on the DI shape */
+  color?: { stroke?: string; fill?: string };
 };
+
+// dataStores[] also accept optional `color`
 ```
+
+### DI colors (`bioc` / `color`)
+
+Optional `color` on nodes and data stores is written onto `bpmndi:BPMNShape`:
+
+```typescript
+{ id: "start", type: "start", color: { stroke: "#0d4372", fill: "#bbdefb" } }
+```
+
+```xml
+<bpmndi:BPMNShape … bioc:stroke="#0d4372" bioc:fill="#bbdefb"
+  color:background-color="#bbdefb" color:border-color="#0d4372">
+```
+
+Namespaces `xmlns:bioc` / `xmlns:color` are added only when at least one color is present.
 
 ### Local run
 

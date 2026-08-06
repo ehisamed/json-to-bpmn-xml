@@ -8,6 +8,7 @@ import type { ProcessModel } from "../types/process";
 import type { BPMNModdle, FlowNode } from "bpmn-moddle";
 import format from "xml-formatter";
 import { normalizeModel } from "../utils/normalize-model";
+import type { DiColor } from "../types/di-color";
 
 export class BpmnConverter {
   private moddle: BPMNModdle;
@@ -36,6 +37,8 @@ export class BpmnConverter {
     const participants: any[] = [];
 
     const dataStoreById = new Map<string, any>();
+    const colorsById = new Map<string, DiColor>();
+
     for (const store of normalized.dataStores) {
       const attrs: Record<string, unknown> = { id: store.id };
       if (store.name !== undefined) attrs.name = store.name;
@@ -43,6 +46,7 @@ export class BpmnConverter {
         store.id,
         this.moddle.create("bpmn:DataStoreReference", attrs),
       );
+      if (store.color) colorsById.set(store.id, store.color);
     }
 
     // Attach each data store to the first process that references it (or the first process).
@@ -62,6 +66,9 @@ export class BpmnConverter {
       const elements = processDef.nodes.map((node) =>
         this.nodeBuilder.build(node),
       );
+      for (const node of processDef.nodes) {
+        if (node.color) colorsById.set(node.id, node.color);
+      }
       const elementById = new Map(
         elements.map((el) => [String(el.id), el] as [string, FlowNode]),
       );
@@ -194,6 +201,7 @@ export class BpmnConverter {
     const definitions = this.definitionsBuilder.build(
       normalized.id,
       rootElements,
+      { withDiColors: colorsById.size > 0 },
     );
 
     const dataAssociationMetas = this.collectDataAssociationMetas(
@@ -208,6 +216,7 @@ export class BpmnConverter {
         processes: processDiagramInputs,
         messageFlows: messageFlowMetas,
         dataAssociations: dataAssociationMetas,
+        colorsById,
       }),
     ];
 

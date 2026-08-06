@@ -17,6 +17,7 @@ export const accountsPayable: ProcessModel = {
     {
       id: "DataStoreReference_05gbcij",
       name: "Due Invoices DB",
+      color: { stroke: "#6b3c00", fill: "#ffe0b2" },
     },
   ],
 
@@ -35,6 +36,7 @@ export const accountsPayable: ProcessModel = {
           id: "StartEvent_1",
           type: "start",
           laneId: "Lane_Finance",
+          color: { stroke: "#0d4372", fill: "#bbdefb" },
         },
         {
           id: "Activity_0jansyu",
@@ -96,12 +98,14 @@ export const accountsPayable: ProcessModel = {
           id: "Event_19ymtw0",
           type: "end",
           laneId: "Lane_CFO",
+          color: { stroke: "#205022", fill: "#c8e6c9" },
         },
         {
           id: "Event_0zymfw5",
           type: "end",
           name: "OK",
           laneId: "Lane_CFO",
+          color: { stroke: "#6b3c00", fill: "#ffe0b2" },
         },
       ],
       edges: [
@@ -219,6 +223,7 @@ export const accountsPayable: ProcessModel = {
         {
           id: "Event_046llah",
           type: "end",
+          color: { stroke: "#5b176d", fill: "#e1bee7" },
         },
       ],
       edges: [

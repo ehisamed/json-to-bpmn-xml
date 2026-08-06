@@ -5,6 +5,7 @@ import type { IEdge } from "./types/edge";
 import type { ILane } from "./types/lane";
 import type { IMessageFlow } from "./types/message-flow";
 import type { IDataStore } from "./types/data-store";
+import type { DiColor } from "./types/di-color";
 
 export async function convert(model: ProcessModel): Promise<string> {
   const converter = new BpmnConverter();
@@ -20,6 +21,7 @@ export type {
   ILane,
   IMessageFlow,
   IDataStore,
+  DiColor,
   NodeType,
   EventDefinition,
 };

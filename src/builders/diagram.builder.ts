@@ -3,6 +3,7 @@ import { layoutGraph } from "../elk.layout";
 import type { FlowMeta } from "./flow.builder";
 import type { INode } from "../types/node";
 import type { ILane } from "../types/lane";
+import { applyDiColor, type DiColor } from "../types/di-color";
 import { dedupePoints, routeOrthogonalEdges } from "../utils/edge-router";
 
 type Bounds = { x: number; y: number; width: number; height: number };
@@ -67,6 +68,8 @@ export type DataAssociationMeta = {
 };
 
 export class DiagramBuilder {
+  private colorsById = new Map<string, DiColor>();
+
   constructor(private moddle: BPMNModdle) {}
 
   async build(options: {
@@ -74,13 +77,16 @@ export class DiagramBuilder {
     processes: ProcessDiagramInput[];
     messageFlows?: MessageFlowMeta[];
     dataAssociations?: DataAssociationMeta[];
+    colorsById?: Map<string, DiColor>;
   }) {
     const {
       collaboration,
       processes,
       messageFlows = [],
       dataAssociations = [],
+      colorsById,
     } = options;
+    this.colorsById = colorsById ?? new Map();
 
     if (!collaboration && processes.length === 1) {
       const only = processes[0]!;
@@ -140,11 +146,7 @@ export class DiagramBuilder {
         };
         positionByNodeId.set(String(store.id), bounds);
         planeElements.push(
-          this.moddle.create("bpmndi:BPMNShape", {
-            id: `${store.id}_di`,
-            bpmnElement: store,
-            bounds: this.moddle.create("dc:Bounds", bounds),
-          }),
+          this.createShape(String(store.id), store, bounds),
         );
       });
     }
@@ -465,13 +467,7 @@ export class DiagramBuilder {
       };
       positions.set(String(store.id), bounds);
       storeBottom = Math.max(storeBottom, bounds.y + bounds.height);
-      storeShapes.push(
-        this.moddle.create("bpmndi:BPMNShape", {
-          id: `${store.id}_di`,
-          bpmnElement: store,
-          bounds: this.moddle.create("dc:Bounds", bounds),
-        }),
-      );
+      storeShapes.push(this.createShape(String(store.id), store, bounds));
     });
 
     const poolHeight = Math.max(
@@ -1127,21 +1123,35 @@ export class DiagramBuilder {
     }
   }
 
+  private createShape(
+    id: string,
+    bpmnElement: any,
+    bounds: Bounds,
+    extra?: { isHorizontal?: boolean },
+  ) {
+    const shape = this.moddle.create("bpmndi:BPMNShape", {
+      id: `${id}_di`,
+      bpmnElement,
+      ...(extra?.isHorizontal !== undefined
+        ? { isHorizontal: extra.isHorizontal }
+        : {}),
+      bounds: this.moddle.create("dc:Bounds", {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: bounds.width,
+        height: bounds.height,
+      }),
+    });
+    applyDiColor(shape, this.colorsById.get(id));
+    return shape;
+  }
+
   private createNodeShapes(elements: any[], positions: Map<string, Bounds>) {
     return elements
       .map((el) => {
         const b = positions.get(String(el.id));
         if (!b) return null;
-        return this.moddle.create("bpmndi:BPMNShape", {
-          id: `${el.id}_di`,
-          bpmnElement: el,
-          bounds: this.moddle.create("dc:Bounds", {
-            x: Math.round(b.x),
-            y: Math.round(b.y),
-            width: b.width,
-            height: b.height,
-          }),
-        });
+        return this.createShape(String(el.id), el, b);
       })
       .filter(Boolean);
   }

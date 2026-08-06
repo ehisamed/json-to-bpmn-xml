@@ -1,3 +1,5 @@
+import type { DiColor } from "./di-color";
+
 export type NodeType =
   | "start"
   | "end"
@@ -35,4 +37,7 @@ export interface INode {
 
   /** Data store ids this node reads from (dataInputAssociation). */
   dataInputs?: string[];
+
+  /** Optional DI fill/stroke (bpmn.io bioc + color extensions). */
+  color?: DiColor;
 }
