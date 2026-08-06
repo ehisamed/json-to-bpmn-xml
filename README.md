@@ -10,6 +10,7 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 
 **JSON structure reference (full rules, nesting, types):**
 
+- Docs index: [docs/README.md](./docs/README.md)
 - English: [docs/json-schema.en.md](./docs/json-schema.en.md)
 - Русский: [docs/json-schema.ru.md](./docs/json-schema.ru.md)
 
@@ -244,6 +245,17 @@ npm run local
 
 Edit `scripts/local-run.ts` to import any fixture from `fixtures/models`.
 
+### Fixture PNG previews
+
+Render every fixture to `.bpmn` + framed `.png` (white background, padding, thin border). Layout/conversion is unchanged — framing is image-only.
+
+```bash
+npm run preview:setup   # once: install Puppeteer Chrome
+npm run preview         # → previews/YYYY-MM-DD_HH-mm-ss/*.bpmn + *.png
+```
+
+`previews/` is gitignored. Details: [docs/README.md](./docs/README.md#fixture-previews-png).
+
 ## Output
 
 ### Simple process (no lanes)
@@ -337,6 +349,8 @@ npm run example:gateway   # exclusive gateway
 npm run example:service   # service task
 npm run example:accounts  # accounts payable collaboration
 npm run local             # default: accounts-payable fixture (edit script to switch)
+npm run preview:setup     # once: Puppeteer Chrome for PNG previews
+npm run preview           # all fixtures → previews/<timestamp>/*.bpmn + *.png
 npm test
 npm run build
 ```
@@ -344,8 +358,11 @@ npm run build
 | Path | Description |
 | ---- | ----------- |
 | `examples/` | Runnable demo scripts |
-| `fixtures/models/` | Reusable `ProcessModel` fixtures (English), for local-run and tests |
+| `fixtures/models/` | Reusable `ProcessModel` fixtures, for local-run, preview, and tests |
 | `scripts/local-run.ts` | Dev runner — import any fixture and print XML |
+| `scripts/render-fixtures.ts` | Preview runner — convert all fixtures to BPMN + PNG |
+| `previews/` | Generated preview folders (gitignored) |
+| `docs/` | JSON schema docs + [docs index](./docs/README.md) |
 | `tests/` | Vitest suite |
 | `src/` | Library source (published via `dist/`) |
 
@@ -362,7 +379,7 @@ npm run build
 | `processPayable` | `process-payable.ts` | Simplified single-pool payable slice |
 | `schedulePayments` | `schedule-payments.ts` | Simplified schedule-payments slice |
 
-Complex fixtures share the same patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass (`NO` over the main spine), message flows, and a shared data store.
+Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store.
 
 Switch the model in `scripts/local-run.ts`:
 
@@ -376,11 +393,18 @@ const xml = await convert(accountsPayable);
 console.log(xml);
 ```
 
+Or render all fixtures as images:
+
+```bash
+npm run preview
+```
+
 ## Built With
 
 - [bpmn-moddle](https://github.com/bpmn-io/bpmn-moddle) — BPMN model + XML serialization
 - [elkjs](https://github.com/kieler/elkjs) — graph layout (layered)
 - [xml-formatter](https://github.com/chrisbottin/xml-formatter) — readable XML output
+- [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image) — fixture PNG previews (dev)
 
 ## License
 

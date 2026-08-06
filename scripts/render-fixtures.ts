@@ -11,7 +11,8 @@
  * PNG framing (white background + padding) is applied after render —
  * conversion / layout logic is untouched.
  */
-import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
+import { mkdir, writeFile, readFile, stat, access } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { styleText } from "node:util";
@@ -26,6 +27,14 @@ const PREVIEWS_ROOT = path.join(ROOT, "previews");
 /** White margin around the diagram in the final PNG (CSS px). */
 const FRAME_PADDING_PX = 48;
 const FRAME_BORDER_PX = 2;
+
+const SYSTEM_CHROME_CANDIDATES = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/usr/bin/google-chrome",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+];
 
 type FixtureEntry = { name: string; model: ProcessModel };
 
@@ -99,6 +108,61 @@ async function fileSize(filePath: string): Promise<string> {
   }
 }
 
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve a Chrome binary for Puppeteer / bpmn-to-image.
+ * Prefers env → bundled Chrome → system Chrome → auto-install.
+ */
+async function ensureChrome(): Promise<string> {
+  const bundled = (() => {
+    try {
+      return puppeteer.executablePath();
+    } catch {
+      return null;
+    }
+  })();
+
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    bundled,
+    ...SYSTEM_CHROME_CANDIDATES,
+  ].filter((p): p is string => !!p);
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return candidate;
+  }
+
+  console.log(
+    `  ${ansi.step("Chrome missing")} — installing Puppeteer browser…`,
+  );
+  const result = spawnSync(
+    "npx",
+    ["puppeteer", "browsers", "install", "chrome"],
+    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32" },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      "Chrome for Puppeteer is not installed. Run: npm run preview:setup",
+    );
+  }
+
+  const after = puppeteer.executablePath();
+  if (!(await pathExists(after))) {
+    throw new Error(
+      "Chrome install finished but binary still missing. Run: npm run preview:setup",
+    );
+  }
+  return after;
+}
+
 /** Silence bpmn-to-image's own "writing …" logs during our progress UI. */
 async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
   const original = console.log;
@@ -122,7 +186,10 @@ async function framePngOnWhiteCard(pngPath: string): Promise<void> {
   const raw = await readFile(pngPath);
   const dataUrl = `data:image/png;base64,${raw.toString("base64")}`;
 
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+  });
   try {
     const page = await browser.newPage();
     await page.setContent(
@@ -241,6 +308,9 @@ async function renderOne(
 }
 
 async function main() {
+  const chromePath = await ensureChrome();
+  process.env.PUPPETEER_EXECUTABLE_PATH = chromePath;
+
   const fixtures = collectFixtures();
   const stamp = stampFolderName();
   const outDir = path.join(PREVIEWS_ROOT, stamp);
@@ -259,6 +329,7 @@ async function main() {
   console.log(
     `  ${ansi.dim("frame:   ")} white + ${FRAME_PADDING_PX}px pad + ${FRAME_BORDER_PX}px border`,
   );
+  console.log(`  ${ansi.dim("chrome:  ")} ${ansi.path(chromePath)}`);
   console.log(`  ${ansi.dim(line())}`);
 
   if (fixtures.length === 0) {
