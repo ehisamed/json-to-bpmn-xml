@@ -30,11 +30,16 @@ Node types: `start | end | userTask | serviceTask | exclusiveGateway | parallelG
 
 ## Layout
 - ELK layered, RIGHT, ORTHOGONAL (X positions).
-- Without lanes: raw ELK coordinates + ELK edge sections.
+- Without lanes: raw ELK coordinates; edges via orthogonal router.
 - With lanes:
   - Participant at `POOL_OFFSET`; **lanes inset by `POOL_HEADER_WIDTH` (30)** so pool title and lane titles do not overlap.
   - Nodes vertically centered in equal-height lanes.
-  - Edges: Manhattan routing from final node bounds (not transformed ELK waypoints).
+  - Edges: `src/utils/edge-router.ts`
+    - forward cross-lane → side docks (Z in gap)
+    - upward branch → top exit
+    - backward loop with node below → left exit + left channel (avoid cutting through stacked lane nodes)
+    - obstacle bypass if a segment still hits a node
+    - dock spreading + straight snap for near-horizontal links
 
 ## Scripts
 - `npm test` — vitest

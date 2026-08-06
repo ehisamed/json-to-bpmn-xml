@@ -3,6 +3,10 @@ import { layoutGraph } from "../elk.layout";
 import type { FlowMeta } from "./flow.builder";
 import type { INode } from "../types/node";
 import type { ILane } from "../types/lane";
+import {
+  dedupePoints,
+  routeOrthogonalEdges,
+} from "../utils/edge-router";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 type Point = { x: number; y: number };
@@ -21,11 +25,10 @@ const LANE_HEADER_WIDTH = 30;
 
 const POOL_OFFSET_X = 160;
 const POOL_OFFSET_Y = 80;
-const NODE_IN_LANE_MARGIN_X = 40;
-const NODE_IN_LANE_PADDING_Y = 40;
-const DEFAULT_LANE_HEIGHT = 180;
+const NODE_IN_LANE_MARGIN_X = 50;
+const NODE_IN_LANE_PADDING_Y = 50;
+const DEFAULT_LANE_HEIGHT = 200;
 const CONTENT_PADDING = 80;
-const BACKWARD_EDGE_GAP = 40;
 
 function getBounds(type: string) {
   if (type === "bpmn:StartEvent" || type === "bpmn:EndEvent") {
@@ -39,93 +42,6 @@ function getBounds(type: string) {
   return NODE_SIZE.default;
 }
 
-function center(b: Bounds): Point {
-  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-}
-
-function dedupePoints(points: Point[]): Point[] {
-  return points.filter((point, index) => {
-    if (index === 0) return true;
-    const prev = points[index - 1]!;
-    return (
-      Math.abs(point.x - prev.x) > 0.5 || Math.abs(point.y - prev.y) > 0.5
-    );
-  });
-}
-
-/**
- * Build orthogonal (Manhattan) waypoints between two placed shapes.
- * Uses border attachment points so edges do not cut through nodes.
- */
-function orthogonalWaypoints(source: Bounds, target: Bounds): Point[] {
-  const sc = center(source);
-  const tc = center(target);
-  const dx = tc.x - sc.x;
-  const dy = tc.y - sc.y;
-
-  let from: Point;
-  let to: Point;
-
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    if (dx >= 0) {
-      from = { x: source.x + source.width, y: sc.y };
-      to = { x: target.x, y: tc.y };
-    } else {
-      from = { x: source.x, y: sc.y };
-      to = { x: target.x + target.width, y: tc.y };
-    }
-  } else if (dy >= 0) {
-    from = { x: sc.x, y: source.y + source.height };
-    to = { x: tc.x, y: target.y };
-  } else {
-    from = { x: sc.x, y: source.y };
-    to = { x: tc.x, y: target.y + target.height };
-  }
-
-  // Same row / column — straight segment.
-  if (Math.abs(from.y - to.y) < 1) {
-    return dedupePoints([from, { x: to.x, y: from.y }]);
-  }
-  if (Math.abs(from.x - to.x) < 1) {
-    return dedupePoints([from, { x: from.x, y: to.y }]);
-  }
-
-  // Forward (left → right): mid-X elbow.
-  if (to.x >= from.x) {
-    const midX = Math.round((from.x + to.x) / 2);
-    return dedupePoints([
-      from,
-      { x: midX, y: from.y },
-      { x: midX, y: to.y },
-      to,
-    ]);
-  }
-
-  // Backward / loop: route below or above to avoid crossing mid-nodes.
-  const goBelow = dy >= 0;
-  const bypassY = goBelow
-    ? Math.max(from.y, to.y) + BACKWARD_EDGE_GAP
-    : Math.min(from.y, to.y) - BACKWARD_EDGE_GAP;
-
-  // Prefer leaving vertically when source is to the right of target.
-  const leave: Point =
-    Math.abs(dx) >= Math.abs(dy)
-      ? { x: from.x, y: bypassY }
-      : from.y === source.y || from.y === source.y + source.height
-        ? { x: from.x, y: bypassY }
-        : { x: from.x, y: bypassY };
-
-  return dedupePoints([
-    from,
-    leave,
-    { x: to.x, y: leave.y },
-    to,
-  ]);
-}
-
-/**
- * Orthogonal waypoints from ELK edge geometry (no-lane mode).
- */
 function elkWaypoints(section: any): Point[] {
   const raw = [
     section.startPoint,
@@ -209,6 +125,29 @@ export class DiagramBuilder {
     });
   }
 
+  private createEdgeElements(
+    flows: FlowMeta[],
+    waypointsById: Map<string, Point[]>,
+  ) {
+    return flows
+      .map((meta) => {
+        const points = waypointsById.get(meta.id);
+        if (!points || points.length < 2 || !meta.flow) return null;
+
+        return this.moddle.create("bpmndi:BPMNEdge", {
+          id: `${meta.id}_di`,
+          bpmnElement: meta.flow,
+          waypoint: points.map((point) =>
+            this.moddle.create("dc:Point", {
+              x: point.x,
+              y: point.y,
+            }),
+          ),
+        });
+      })
+      .filter(Boolean);
+  }
+
   private buildWithoutLanes(
     process: any,
     elements: any[],
@@ -239,42 +178,26 @@ export class DiagramBuilder {
       })
       .filter(Boolean);
 
-    const flowById = new Map(flows.map((f) => [f.id, f]));
-    const edgesDi = (layout.edges ?? [])
-      .map((edge: any) => {
-        const meta =
-          flowById.get(String(edge.id)) ??
-          flows.find(
-            (f) =>
-              f.source === String(edge.sources?.[0]) &&
-              f.target === String(edge.targets?.[0]),
-          );
-        if (!meta?.flow) return null;
+    // Prefer orthogonal router; fall back to ELK geometry if needed.
+    const routed = routeOrthogonalEdges(
+      flows.map((f) => ({
+        id: f.id,
+        sourceId: f.source,
+        targetId: f.target,
+      })),
+      positionByNodeId,
+    );
 
-        const section = edge.sections?.[0];
-        let points =
-          section && elkWaypoints(section).length >= 2
-            ? elkWaypoints(section)
-            : null;
+    for (const edge of layout.edges ?? []) {
+      const id = String(edge.id);
+      if (routed.has(id)) continue;
+      const section = edge.sections?.[0];
+      if (!section) continue;
+      const points = elkWaypoints(section);
+      if (points.length >= 2) routed.set(id, points);
+    }
 
-        if (!points) {
-          const source = positionByNodeId.get(meta.source);
-          const target = positionByNodeId.get(meta.target);
-          if (!source || !target) return null;
-          points = orthogonalWaypoints(source, target);
-        }
-
-        if (points.length < 2) return null;
-
-        return this.moddle.create("bpmndi:BPMNEdge", {
-          id: `${meta.id}_di`,
-          bpmnElement: meta.flow,
-          waypoint: points.map((point) =>
-            this.moddle.create("dc:Point", point),
-          ),
-        });
-      })
-      .filter(Boolean);
+    const edgesDi = this.createEdgeElements(flows, routed);
 
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
@@ -311,8 +234,6 @@ export class DiagramBuilder {
       sourceLanes.map((lane, index) => [lane.id, index]),
     );
 
-    // Uniform lane height: tall enough for the tallest node + padding.
-    // Nodes are vertically centered — keeps cross-lane edges clean.
     let maxNodeHeight = NODE_SIZE.default.height;
     for (const child of nodeMap.values()) {
       maxNodeHeight = Math.max(
@@ -333,7 +254,10 @@ export class DiagramBuilder {
     }, []);
 
     const contentOriginX =
-      POOL_OFFSET_X + POOL_HEADER_WIDTH + LANE_HEADER_WIDTH + NODE_IN_LANE_MARGIN_X;
+      POOL_OFFSET_X +
+      POOL_HEADER_WIDTH +
+      LANE_HEADER_WIDTH +
+      NODE_IN_LANE_MARGIN_X;
 
     const positionByNodeId = new Map<string, Bounds>();
 
@@ -392,8 +316,6 @@ export class DiagramBuilder {
         })
       : null;
 
-    // Lanes are inset by POOL_HEADER_WIDTH so pool title and lane titles
-    // do not occupy the same vertical strip (bpmn.io / Camunda convention).
     const laneShapes = laneElements.map((lane, index) =>
       this.moddle.create("bpmndi:BPMNShape", {
         id: `${lane.id}_di`,
@@ -408,27 +330,16 @@ export class DiagramBuilder {
       }),
     );
 
-    const edgesDi = flows
-      .map((meta) => {
-        const source = positionByNodeId.get(meta.source);
-        const target = positionByNodeId.get(meta.target);
-        if (!source || !target || !meta.flow) return null;
+    const waypointsById = routeOrthogonalEdges(
+      flows.map((f) => ({
+        id: f.id,
+        sourceId: f.source,
+        targetId: f.target,
+      })),
+      positionByNodeId,
+    );
 
-        const points = orthogonalWaypoints(source, target);
-        if (points.length < 2) return null;
-
-        return this.moddle.create("bpmndi:BPMNEdge", {
-          id: `${meta.id}_di`,
-          bpmnElement: meta.flow,
-          waypoint: points.map((point) =>
-            this.moddle.create("dc:Point", {
-              x: Math.round(point.x),
-              y: Math.round(point.y),
-            }),
-          ),
-        });
-      })
-      .filter(Boolean);
+    const edgesDi = this.createEdgeElements(flows, waypointsById);
 
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
