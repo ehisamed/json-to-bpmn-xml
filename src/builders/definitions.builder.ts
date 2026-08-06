@@ -3,13 +3,9 @@ import type { BPMNModdle } from "bpmn-moddle";
 export class DefinitionsBuilder {
   constructor(private moddle: BPMNModdle) {}
 
-  build(process: any, collaboration?: any) {
-    const rootElements = collaboration
-      ? [collaboration, process]
-      : [process];
-
+  build(definitionsId: string, rootElements: any[]) {
     const definitions = this.moddle.create("bpmn:Definitions", {
-      id: `${process.id}_definitions`,
+      id: `${definitionsId}_definitions`,
       targetNamespace: "http://www.omg.org/spec/BPMN/20100524/MODEL",
       rootElements,
     });

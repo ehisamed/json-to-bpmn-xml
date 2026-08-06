@@ -14,28 +14,31 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 
 - **JSON → BPMN 2.0 XML** via [`bpmn-moddle`](https://github.com/bpmn-io/bpmn-moddle)
 - **Pretty-printed XML** with declaration, namespaces, and `xsi:schemaLocation`
-- **Node types**: start/end events, user/service tasks, exclusive & parallel gateways
-- **Swimlanes (lanes)**: `laneSet`, `flowNodeRef`, collaboration + participant, DI shapes
-- **Auto layout**:
-  - X positions from [ELK](https://github.com/kieler/elkjs) (layered, left → right)
-  - With lanes: nodes centered in lane bands; pool/lane headers do not overlap
-  - Orthogonal (Manhattan) edges with side docks, loops, and obstacle-aware routing
-- **Validation** of the input model (ids, edge ends, `laneId` references)
-- **TypeScript** types exported from the package
-- **ESM** module
+- **Node types**: start/end, task, user/service task, subProcess, exclusive / parallel / event-based gateways, intermediate catch (timer/message)
+- **Event definitions** on start & intermediate catch (`timer` | `message`)
+- **Multi-instance** loops (parallel or sequential)
+- **Swimlanes** and **multi-pool collaborations** with message flows
+- **Data stores** + data input/output associations
+- **Auto layout** (ELK + orthogonal edge routing)
+- **Validation** of the input model
+- **TypeScript** types + **ESM**
 
 ## Supported Node Types
 
-| JSON `type`         | BPMN element              |
-| ------------------- | ------------------------- |
-| `start`             | `bpmn:StartEvent`         |
-| `end`               | `bpmn:EndEvent`           |
-| `userTask`          | `bpmn:UserTask`           |
-| `serviceTask`       | `bpmn:ServiceTask`        |
-| `exclusiveGateway`  | `bpmn:ExclusiveGateway`   |
-| `parallelGateway`   | `bpmn:ParallelGateway`    |
+| JSON `type` | BPMN element | Notes |
+| --- | --- | --- |
+| `start` | `bpmn:StartEvent` | optional `eventDefinition: "timer" \| "message"` |
+| `end` | `bpmn:EndEvent` | |
+| `task` | `bpmn:Task` | generic task |
+| `userTask` | `bpmn:UserTask` | |
+| `serviceTask` | `bpmn:ServiceTask` | |
+| `subProcess` | `bpmn:SubProcess` | collapsed (empty body) |
+| `exclusiveGateway` | `bpmn:ExclusiveGateway` | |
+| `parallelGateway` | `bpmn:ParallelGateway` | |
+| `eventBasedGateway` | `bpmn:EventBasedGateway` | |
+| `intermediateCatch` | `bpmn:IntermediateCatchEvent` | requires `eventDefinition` |
 
-> More BPMN element types may be added in future releases.
+Common node options: `multiInstance`, `dataInputs`, `dataOutputs`, `laneId`.
 
 ## Installation
 
@@ -140,56 +143,65 @@ const xml = await converter.convert(model);
 ```typescript
 import type {
   ProcessModel,
+  IProcessDef,
   INode,
   IEdge,
   ILane,
+  IMessageFlow,
+  IDataStore,
   NodeType,
+  EventDefinition,
 } from "json-to-bpmn-xml";
 ```
 
 ## ProcessModel
 
-```typescript
-type NodeType =
-  | "start"
-  | "end"
-  | "userTask"
-  | "serviceTask"
-  | "exclusiveGateway"
-  | "parallelGateway";
+Supports **simple** (one process) and **collaboration** (many pools) shapes.
 
+```typescript
 type ProcessModel = {
   id: string;
   name?: string;
-  /** Optional swimlanes. When set, collaboration + lane DI are generated. */
-  lanes?: {
+
+  // --- Simple mode (single process) ---
+  lanes?: { id: string; name: string }[];
+  nodes?: INode[];
+  edges?: IEdge[];
+
+  // --- Collaboration mode ---
+  processes?: {
     id: string;
-    name: string;
-  }[];
-  nodes: {
-    id: string;
-    type: NodeType;
     name?: string;
-    /** References `lanes[].id`. Input-only (not emitted on the BPMN element). */
-    laneId?: string;
+    participantId?: string;
+    participantName?: string;
+    lanes?: { id: string; name: string }[];
+    nodes: INode[];
+    edges: IEdge[];
   }[];
-  edges: {
-    id?: string;
-    source: string;
-    target: string;
-    name?: string;
-  }[];
+  messageFlows?: { id?: string; source: string; target: string; name?: string }[];
+  dataStores?: { id: string; name?: string }[];
+};
+
+type INode = {
+  id: string;
+  type: NodeType;
+  name?: string;
+  laneId?: string;
+  eventDefinition?: "timer" | "message";
+  multiInstance?: boolean | { sequential?: boolean };
+  dataInputs?: string[];  // data store ids
+  dataOutputs?: string[]; // data store ids
 };
 ```
 
-### Validation rules
+### Local run (accounts payable sample)
 
-`convert` throws if:
+```bash
+npm run local
+# → converts fixtures/models/accounts-payable.ts
+```
 
-- `id` is missing, or `nodes` is empty
-- node / lane ids are duplicated
-- an edge `source` / `target` does not match a node id
-- a node `laneId` does not match any lane id
+Swap the import in `scripts/local-run.ts` to any other fixture.
 
 ## Output
 
@@ -300,8 +312,9 @@ npm run build
 | `lanesSimpleFlow` | `lanes-simple-flow.ts` | Start → task → end in one lane |
 | `orderCrossLane` | `order-cross-lane.ts` | Cross-lane flow with gateway |
 | `advancedOrder` | `advanced-order.ts` | Full demo (retry loop, packing, delivery) |
-| `processPayable` | `process-payable.ts` | Approximated pool from accounts-payable sample BPMN |
-| `schedulePayments` | `schedule-payments.ts` | Approximated second pool from the same sample |
+| `accountsPayable` | `accounts-payable.ts` | Full two-pool sample (message flows, events, data store) |
+| `processPayable` | `process-payable.ts` | Approximated single-pool variant |
+| `schedulePayments` | `schedule-payments.ts` | Approximated second-pool variant |
 
 Switch the model in `scripts/local-run.ts`:
 

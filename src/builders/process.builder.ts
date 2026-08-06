@@ -6,14 +6,13 @@ export class ProcessBuilder {
   build(
     id: string,
     name: string | undefined,
-    elements: any[],
-    flows: any[],
+    flowElements: any[],
     laneSets?: any[],
   ) {
     const attrs: Record<string, unknown> = {
       id,
       isExecutable: false,
-      flowElements: [...elements, ...flows],
+      flowElements,
     };
 
     if (name !== undefined) {

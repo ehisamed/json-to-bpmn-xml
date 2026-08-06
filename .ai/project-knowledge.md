@@ -1,36 +1,22 @@
 # Project knowledge
 
 ## Purpose
-JSON → BPMN 2.0 XML converter (`convert(model)`), based on `bpmn-moddle` + ELK layout + `xml-formatter`.
+JSON → BPMN 2.0 XML (`convert`), bpmn-moddle + ELK + orthogonal router.
 
-## Repo layout
+## Layout
 ```
-src/                 # library (published as dist/)
-  builders/
-  converter/
-  constants/
-  types/
-  utils/edge-router.ts
-  elk.layout.ts
-  index.ts
-fixtures/models/     # ProcessModel fixtures (English), for local-run + tests
-scripts/local-run.ts # pick a fixture → print XML
-examples/            # runnable demos
-tests/               # vitest
-assets/
+src/                 library → dist/
+fixtures/models/     ProcessModel fixtures (accountsPayable is the full sample)
+scripts/local-run.ts import a fixture → print XML
+examples/ tests/
 ```
 
-## Public API
-- `convert(model: ProcessModel): Promise<string>`
-- `BpmnConverter`
-- Types: `ProcessModel`, `INode`, `IEdge`, `ILane`, `NodeType`
+## ProcessModel
+- Simple: top-level `nodes` / `edges` / `lanes`
+- Collaboration: `processes[]` + `messageFlows` + `dataStores`
+- Node extras: `eventDefinition`, `multiInstance`, `dataInputs` / `dataOutputs`
+- Types: start/end/task/userTask/serviceTask/subProcess/exclusive|parallel|eventBased gateway/intermediateCatch
 
-## Fixtures
-- `lanesSingleNode`, `lanesSimpleFlow`, `orderCrossLane`, `advancedOrder`
-- Switch import in `scripts/local-run.ts`
-
-## XML / layout rules
-See README. Key: `laneId` input-only; lanes inset for headers; orthogonal edge router in `src/utils/edge-router.ts`.
-
-## Scripts
-- `npm test` / `npm run local` / `npm run example:*` / `npm run build`
+## Full sample
+`fixtures/models/accounts-payable.ts` mirrors diagram (9).bpmn (two pools).
+`npm run local` uses it.

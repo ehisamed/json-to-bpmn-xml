@@ -18,7 +18,8 @@
     "example:gateway": "npx tsx examples/exclusive-gateway.ts",
     "example:service": "npx tsx examples/service-task.ts",
     "example:payable": "npx tsx examples/process-payable.ts",
-    "example:schedule": "npx tsx examples/schedule-payments.ts"
+    "example:schedule": "npx tsx examples/schedule-payments.ts",
+    "example:accounts": "npx tsx examples/accounts-payable.ts"
   },
   "keywords": [
     "bpmn",

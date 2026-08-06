@@ -206,6 +206,12 @@ export function chooseSides(
     return dy > 0 ? ["bottom", "top"] : ["top", "bottom"];
   }
 
+  // Short forward hops with modest vertical offset (event-gateway fan-out):
+  // keep side docks instead of leaving via top/bottom.
+  if (dx > 0 && dx <= 220 && Math.abs(dy) <= 120) {
+    return ["right", "left"];
+  }
+
   if (dx > 0 && dy < -band) {
     return ["top", "left"];
   }
@@ -276,6 +282,35 @@ function routeBetweenDocks(
   }
 
   if (!fromHorizontal && !toHorizontal) {
+    // Nearly aligned column — keep a straight vertical segment.
+    if (Math.abs(from.x - to.x) <= 12) {
+      const x = Math.round((from.x + to.x) / 2);
+      return dedupePoints([
+        { x, y: from.y },
+        { x, y: to.y },
+      ]);
+    }
+
+    if (fromSide === "top" && toSide === "top") {
+      const midY = Math.min(from.y, to.y) - CHANNEL_GAP;
+      return dedupePoints([
+        from,
+        { x: from.x, y: midY },
+        { x: to.x, y: midY },
+        to,
+      ]);
+    }
+
+    if (fromSide === "bottom" && toSide === "bottom") {
+      const midY = Math.max(from.y, to.y) + CHANNEL_GAP;
+      return dedupePoints([
+        from,
+        { x: from.x, y: midY },
+        { x: to.x, y: midY },
+        to,
+      ]);
+    }
+
     if (
       (fromSide === "bottom" && to.y >= from.y) ||
       (fromSide === "top" && to.y <= from.y)
@@ -348,6 +383,60 @@ function avoidObstacles(
 
   const candidates: Point[][] = [];
 
+  // Clear horizontal channel ABOVE all nodes between source and target —
+  // preferred for long skip edges (e.g. gateway "No" → distant end).
+  const spanMinX = Math.min(source.x, target.x) - NODE_PAD;
+  const spanMaxX = Math.max(source.x + source.width, target.x + target.width) + NODE_PAD;
+  let topClearY = Math.min(source.y, target.y) - CHANNEL_GAP;
+  let bottomClearY =
+    Math.max(source.y + source.height, target.y + target.height) + CHANNEL_GAP;
+  for (const [id, b] of boundsById) {
+    if (id === sourceId || id === targetId) continue;
+    const overlapsX = b.x < spanMaxX && b.x + b.width > spanMinX;
+    if (!overlapsX) continue;
+    topClearY = Math.min(topClearY, b.y - CHANNEL_GAP);
+    bottomClearY = Math.max(bottomClearY, b.y + b.height + CHANNEL_GAP);
+  }
+
+  if (to.x >= from.x - 2) {
+    // Top clear channel, enter target from the left (avoids stacked
+    // nodes sitting above the target in the same column).
+    candidates.push(
+      dedupePoints([
+        from,
+        { x: from.x, y: topClearY },
+        { x: target.x - CHANNEL_GAP, y: topClearY },
+        { x: target.x - CHANNEL_GAP, y: to.y },
+        to,
+      ]),
+    );
+    candidates.push(
+      dedupePoints([
+        from,
+        { x: from.x, y: topClearY },
+        { x: to.x, y: topClearY },
+        to,
+      ]),
+    );
+    candidates.push(
+      dedupePoints([
+        from,
+        { x: from.x, y: bottomClearY },
+        { x: target.x - CHANNEL_GAP, y: bottomClearY },
+        { x: target.x - CHANNEL_GAP, y: to.y },
+        to,
+      ]),
+    );
+    candidates.push(
+      dedupePoints([
+        from,
+        { x: from.x, y: bottomClearY },
+        { x: to.x, y: bottomClearY },
+        to,
+      ]),
+    );
+  }
+
   if (toSide === "right" || toSide === "left") {
     const bypassX = backwardBypassX(from, to, toSide, target, source);
     candidates.push(
@@ -391,7 +480,20 @@ function avoidObstacles(
     if (!hitsOther && !enters) return candidate;
   }
 
-  return candidates[0] ?? points;
+  // Prefer the shortest valid-looking clear channel even if slightly dirty.
+  const scored = candidates
+    .filter((c) => c.length >= 2)
+    .map((c) => {
+      const length = c.reduce((sum, p, i) => {
+        if (i === 0) return 0;
+        const prev = c[i - 1]!;
+        return sum + Math.abs(p.x - prev.x) + Math.abs(p.y - prev.y);
+      }, 0);
+      return { c, length };
+    })
+    .sort((a, b) => a.length - b.length);
+
+  return scored[0]?.c ?? candidates[0] ?? points;
 }
 
 function slotRatios(count: number): number[] {

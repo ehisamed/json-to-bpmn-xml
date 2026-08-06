@@ -1,4 +1,4 @@
-export interface IEdge {
+export interface IMessageFlow {
   id?: string;
   source: string;
   target: string;
