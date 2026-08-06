@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "local": "npx tsx scripts/local-run.ts",
+    "preview": "npx tsx scripts/render-fixtures.ts",
     "example:simple": "npx tsx examples/simple-process.ts",
     "example:lanes": "npx tsx examples/lanes.ts",
     "example:gateway": "npx tsx examples/exclusive-gateway.ts",
