@@ -7,17 +7,25 @@
  * Output:
  *   previews/YYYY-MM-DD_HH-mm-ss/<fixture>.bpmn
  *   previews/YYYY-MM-DD_HH-mm-ss/<fixture>.png
+ *
+ * PNG framing (white background + padding) is applied after render —
+ * conversion / layout logic is untouched.
  */
-import { mkdir, writeFile, stat } from "node:fs/promises";
+import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { styleText } from "node:util";
 import { convertAll } from "bpmn-to-image";
+import puppeteer from "puppeteer";
 import { convert, type ProcessModel } from "../src/index";
 import * as fixtureExports from "../fixtures/models";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PREVIEWS_ROOT = path.join(ROOT, "previews");
+
+/** White margin around the diagram in the final PNG (CSS px). */
+const FRAME_PADDING_PX = 48;
+const FRAME_BORDER_PX = 2;
 
 type FixtureEntry = { name: string; model: ProcessModel };
 
@@ -50,15 +58,15 @@ function collectFixtures(): FixtureEntry[] {
 
 function stampFolderName(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-  ].join("-") +
+  return (
+    [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join(
+      "-",
+    ) +
     "_" +
     [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join(
       "-",
-    );
+    )
+  );
 }
 
 function line(char = "─", width = 56): string {
@@ -106,6 +114,80 @@ async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Wrap an already-rendered diagram PNG in a white card with padding
+ * and a thin black border. Does not alter BPMN content.
+ */
+async function framePngOnWhiteCard(pngPath: string): Promise<void> {
+  const raw = await readFile(pngPath);
+  const dataUrl = `data:image/png;base64,${raw.toString("base64")}`;
+
+  const browser = await puppeteer.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(
+      `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+    body {
+      display: inline-block;
+    }
+    .card {
+      display: inline-block;
+      background: #ffffff;
+      padding: ${FRAME_PADDING_PX}px;
+      line-height: 0;
+    }
+    .frame {
+      display: inline-block;
+      border: ${FRAME_BORDER_PX}px solid #000000;
+      background: #ffffff;
+      line-height: 0;
+    }
+    img {
+      display: block;
+      max-width: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="frame">
+      <img id="diagram" src="${dataUrl}" alt="" />
+    </div>
+  </div>
+</body>
+</html>`,
+      { waitUntil: "load" },
+    );
+
+    await page.waitForSelector("#diagram");
+    await page.evaluate(async () => {
+      const img = document.getElementById("diagram") as HTMLImageElement;
+      if (!img.complete) {
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("diagram image failed to load"));
+        });
+      }
+    });
+
+    const card = await page.$(".card");
+    if (!card) throw new Error("frame card not found");
+    await card.screenshot({ path: pngPath, type: "png", omitBackground: false });
+  } finally {
+    await browser.close();
+  }
+}
+
 async function renderOne(
   entry: FixtureEntry,
   outDir: string,
@@ -133,13 +215,22 @@ async function renderOne(
     `    ${ansi.dim("├─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(bpmnPath))}`,
   );
 
-  console.log(`    ${ansi.dim("└─")} ${ansi.step("BPMN → PNG")} …`);
+  console.log(`    ${ansi.dim("├─")} ${ansi.step("BPMN → PNG")} …`);
   await withQuietConsole(() =>
-    convertAll(
-      [{ input: bpmnPath, outputs: [pngPath] }],
-      { footer: false, title: entry.name, deviceScaleFactor: 2 },
-    ),
+    convertAll([{ input: bpmnPath, outputs: [pngPath] }], {
+      footer: false,
+      title: false,
+      deviceScaleFactor: 2,
+    }),
   );
+  console.log(
+    `    ${ansi.dim("├─")} ${ansi.ok("✓")} rendered ${ansi.path(path.basename(pngPath))}`,
+  );
+
+  console.log(
+    `    ${ansi.dim("└─")} ${ansi.step("white frame + padding")} …`,
+  );
+  await framePngOnWhiteCard(pngPath);
 
   const pngSize = await fileSize(pngPath);
   console.log(
@@ -156,11 +247,18 @@ async function main() {
 
   console.log();
   console.log(ansi.title(`  ╔${line("═")}╗`));
-  console.log(ansi.title(`  ║  Fixture → BPMN → PNG preview renderer`.padEnd(57) + `║`));
+  console.log(
+    ansi.title(`  ║  Fixture → BPMN → PNG preview renderer`.padEnd(57) + `║`),
+  );
   console.log(ansi.title(`  ╚${line("═")}╝`));
   console.log();
   console.log(`  ${ansi.dim("fixtures:")} ${ansi.ok(String(fixtures.length))}`);
-  console.log(`  ${ansi.dim("output:  ")} ${ansi.path(path.relative(ROOT, outDir))}`);
+  console.log(
+    `  ${ansi.dim("output:  ")} ${ansi.path(path.relative(ROOT, outDir))}`,
+  );
+  console.log(
+    `  ${ansi.dim("frame:   ")} white + ${FRAME_PADDING_PX}px pad + ${FRAME_BORDER_PX}px border`,
+  );
   console.log(`  ${ansi.dim(line())}`);
 
   if (fixtures.length === 0) {
