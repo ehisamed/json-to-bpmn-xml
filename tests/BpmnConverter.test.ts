@@ -1,5 +1,5 @@
-import { BpmnConverter } from "../converter/BpmnConverter";
-import type { ProcessModel } from "../types/process";
+import { BpmnConverter } from "../src/converter/BpmnConverter";
+import type { ProcessModel } from "../src/types/process";
 import { describe, it, expect } from "vitest";
 
 describe("BpmnConverter", () => {

@@ -86,15 +86,15 @@ const model: ProcessModel = {
   id: "Process_Test_Lanes",
   name: "Lane Test Process",
   lanes: [
-    { id: "Lane_1", name: "Пользователь" },
-    { id: "Lane_2", name: "Система" },
-    { id: "Lane_3", name: "Внешние сервисы" },
+    { id: "Lane_1", name: "User" },
+    { id: "Lane_2", name: "System" },
+    { id: "Lane_3", name: "External Service" },
   ],
   nodes: [
     { id: "start", type: "start", name: "Start", laneId: "Lane_1" },
-    { id: "task_user", type: "userTask", name: "Заполнить форму", laneId: "Lane_1" },
-    { id: "task_system", type: "serviceTask", name: "Проверить данные", laneId: "Lane_2" },
-    { id: "task_ext", type: "serviceTask", name: "Вызов API", laneId: "Lane_3" },
+    { id: "task_user", type: "userTask", name: "Fill form", laneId: "Lane_1" },
+    { id: "task_system", type: "serviceTask", name: "Validate data", laneId: "Lane_2" },
+    { id: "task_ext", type: "serviceTask", name: "Call API", laneId: "Lane_3" },
     { id: "end", type: "end", name: "End", laneId: "Lane_1" },
   ],
   edges: [
@@ -110,13 +110,13 @@ const xml = await convert(model);
 
 ### Advanced example (gateway + loop + cross-lane)
 
-See `src/local-run.ts` / run:
+Use the `advancedOrder` fixture:
 
 ```bash
 npm run local
 ```
 
-That model produces a multi-lane order process (user / system / external service) with an exclusive gateway, retry loop, and two end events — the screenshot at the top of this README.
+It lives in `fixtures/models/advanced-order.ts` and produces a multi-lane order process (User / System / External Service) with an exclusive gateway, retry loop, and two end events — the screenshot at the top of this README.
 
 ## API
 
@@ -242,7 +242,7 @@ Root elements include **collaboration** (pool) and **process** with `laneSet`:
 
 <bpmn:process id="Process_Test_Lanes" name="Lane Test Process" isExecutable="false">
   <bpmn:laneSet id="LaneSet_1">
-    <bpmn:lane id="Lane_1" name="Пользователь">
+    <bpmn:lane id="Lane_1" name="User">
       <bpmn:flowNodeRef>start</bpmn:flowNodeRef>
       <bpmn:flowNodeRef>task_user</bpmn:flowNodeRef>
       <bpmn:flowNodeRef>end</bpmn:flowNodeRef>
@@ -275,20 +275,42 @@ Coordinates are deterministic for a given model (good for tests / snapshots). Ex
 ## Examples in the repo
 
 ```bash
-npm run example:simple   # process without lanes
-npm run example:lanes    # three lanes
-npm run local            # advanced order process (gateway + loop)
-npm test                 # vitest
-npm run build            # tsup → dist/
+npm run example:simple    # process without lanes
+npm run example:lanes     # three lanes
+npm run example:gateway   # exclusive gateway
+npm run example:service   # service task
+npm run local             # advanced order fixture (edit scripts/local-run.ts to switch models)
+npm test
+npm run build
 ```
 
-| File | Description |
+| Path | Description |
 | ---- | ----------- |
-| `example/simple-process.ts` | Minimal start → task → end |
-| `example/service-task.ts` | Service task |
-| `example/exclusive-gateway.ts` | XOR split |
-| `example/lanes.ts` | Swimlanes |
-| `src/local-run.ts` | Full multi-lane demo |
+| `examples/` | Runnable demo scripts |
+| `fixtures/models/` | Reusable `ProcessModel` fixtures (English), for local-run and tests |
+| `scripts/local-run.ts` | Dev runner — import any fixture and print XML |
+| `tests/` | Vitest suite |
+| `src/` | Library source (published via `dist/`) |
+
+### Fixtures (`fixtures/models/`)
+
+| Export | File | Purpose |
+| ------ | ---- | ------- |
+| `lanesSingleNode` | `lanes-single-node.ts` | Three lanes, one start event |
+| `lanesSimpleFlow` | `lanes-simple-flow.ts` | Start → task → end in one lane |
+| `orderCrossLane` | `order-cross-lane.ts` | Cross-lane flow with gateway |
+| `advancedOrder` | `advanced-order.ts` | Full demo (retry loop, packing, delivery) |
+
+Switch the model in `scripts/local-run.ts`:
+
+```typescript
+import { convert } from "../src/index";
+import { advancedOrder } from "../fixtures/models";
+// import { lanesSimpleFlow } from "../fixtures/models";
+
+const xml = await convert(advancedOrder);
+console.log(xml);
+```
 
 ## Built With
 

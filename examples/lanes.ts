@@ -1,36 +1,36 @@
 import { convert, type ProcessModel } from "../src/index";
 
 const model: ProcessModel = {
-  id: "Process_Test_Lanes",
-  name: "Lane Test Process",
+  id: "Process_Lanes_Demo",
+  name: "Lane Demo Process",
 
   lanes: [
-    { id: "Lane_1", name: "Пользователь" },
-    { id: "Lane_2", name: "Система" },
-    { id: "Lane_3", name: "Внешние сервисы" },
+    { id: "Lane_User", name: "User" },
+    { id: "Lane_System", name: "System" },
+    { id: "Lane_Service", name: "External Service" },
   ],
 
   nodes: [
-    { id: "start", type: "start", name: "Start", laneId: "Lane_1" },
+    { id: "start", type: "start", name: "Start", laneId: "Lane_User" },
     {
       id: "task_user",
       type: "userTask",
-      name: "Заполнить форму",
-      laneId: "Lane_1",
+      name: "Fill form",
+      laneId: "Lane_User",
     },
     {
       id: "task_system",
       type: "serviceTask",
-      name: "Проверить данные",
-      laneId: "Lane_2",
+      name: "Validate data",
+      laneId: "Lane_System",
     },
     {
       id: "task_ext",
       type: "serviceTask",
-      name: "Вызов API",
-      laneId: "Lane_3",
+      name: "Call API",
+      laneId: "Lane_Service",
     },
-    { id: "end", type: "end", name: "End", laneId: "Lane_1" },
+    { id: "end", type: "end", name: "End", laneId: "Lane_User" },
   ],
 
   edges: [

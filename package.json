@@ -1,7 +1,7 @@
 {
   "name": "json-to-bpmn-xml",
   "version": "1.0.2",
-  "description": "JSON to BPMN XML converter",
+  "description": "Convert JSON workflow definitions into BPMN 2.0 XML",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -12,15 +12,19 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest --watch",
-    "local": "npx tsx src/local-run.ts",
-    "example:simple": "npx tsx example/simple-process.ts",
-    "example:lanes": "npx tsx example/lanes.ts"
+    "local": "npx tsx scripts/local-run.ts",
+    "example:simple": "npx tsx examples/simple-process.ts",
+    "example:lanes": "npx tsx examples/lanes.ts",
+    "example:gateway": "npx tsx examples/exclusive-gateway.ts",
+    "example:service": "npx tsx examples/service-task.ts"
   },
   "keywords": [
     "bpmn",
     "xml",
     "converter",
-    "json"
+    "json",
+    "workflow",
+    "lanes"
   ],
   "author": "Samedov Etibar",
   "license": "Apache-2.0",

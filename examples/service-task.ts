@@ -6,12 +6,12 @@ const model: ProcessModel = {
   nodes: [
     { id: "start", type: "start" },
     { id: "service1", type: "serviceTask", name: "Call service" },
-    { id: "end", type: "end" }
+    { id: "end", type: "end" },
   ],
   edges: [
     { id: "e1", source: "start", target: "service1" },
-    { id: "e2", source: "service1", target: "end" }
-  ]
+    { id: "e2", source: "service1", target: "end" },
+  ],
 };
 
 const xml = await convert(model);

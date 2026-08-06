@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   chooseSides,
   routeOrthogonalEdges,
-} from "../utils/edge-router";
+} from "../src/utils/edge-router";
 
 describe("edge-router", () => {
   it("uses side docks for forward cross-lane links", () => {
@@ -65,7 +65,6 @@ describe("edge-router", () => {
       expect(ortho).toBe(true);
     }
 
-    // vertical channel must not cut through pack (x overlap 300..400)
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1]!;
       const b = points[i]!;
@@ -79,7 +78,6 @@ describe("edge-router", () => {
       }
     }
 
-    // approach to pay.right must come from outside (x >= pay.right)
     const pay = bounds.get("pay")!;
     const last = points[points.length - 1]!;
     const prev = points[points.length - 2]!;
@@ -88,7 +86,6 @@ describe("edge-router", () => {
   });
 
   it("does not route a vertical channel through the payment node", () => {
-    // Real-ish layout from Advanced Order Process
     const bounds = new Map([
       ["retry", { x: 968, y: 140, width: 100, height: 80 }],
       ["pack", { x: 968, y: 340, width: 100, height: 80 }],
@@ -112,7 +109,6 @@ describe("edge-router", () => {
       expect(inside).toBe(false);
     }
 
-    // last waypoint on right border
     const last = points[points.length - 1]!;
     expect(last.x).toBe(pay.x + pay.width);
   });

@@ -3,48 +3,34 @@
 ## Purpose
 JSON → BPMN 2.0 XML converter (`convert(model)`), based on `bpmn-moddle` + ELK layout + `xml-formatter`.
 
+## Repo layout
+```
+src/                 # library (published as dist/)
+  builders/
+  converter/
+  constants/
+  types/
+  utils/edge-router.ts
+  elk.layout.ts
+  index.ts
+fixtures/models/     # ProcessModel fixtures (English), for local-run + tests
+scripts/local-run.ts # pick a fixture → print XML
+examples/            # runnable demos
+tests/               # vitest
+assets/
+```
+
 ## Public API
 - `convert(model: ProcessModel): Promise<string>`
 - `BpmnConverter`
 - Types: `ProcessModel`, `INode`, `IEdge`, `ILane`, `NodeType`
 
-## ProcessModel
-```ts
-{
-  id: string;
-  name?: string;
-  lanes?: { id: string; name: string }[];
-  nodes: { id; type; name?; laneId? }[];
-  edges: { id?; source; target; name? }[];
-}
-```
+## Fixtures
+- `lanesSingleNode`, `lanesSimpleFlow`, `orderCrossLane`, `advancedOrder`
+- Switch import in `scripts/local-run.ts`
 
-Node types: `start | end | userTask | serviceTask | exclusiveGateway | parallelGateway`
-
-## XML rules (important)
-- `laneId` is **input-only** — never written into BPMN XML.
-- Without lanes: plane → process, no collaboration.
-- With lanes: collaboration + participant + laneSet + lane DI shapes.
-- Definitions always include `xsi:schemaLocation` and OMG `targetNamespace`.
-- Waypoints are deduplicated (no consecutive identical points).
-
-## Layout
-- ELK layered, RIGHT, ORTHOGONAL (X positions).
-- Without lanes: raw ELK coordinates; edges via orthogonal router.
-- With lanes:
-  - Participant at `POOL_OFFSET`; **lanes inset by `POOL_HEADER_WIDTH` (30)** so pool title and lane titles do not overlap.
-  - Nodes vertically centered in equal-height lanes.
-  - Edges: `src/utils/edge-router.ts`
-    - forward cross-lane → side docks (Z in gap)
-    - upward branch → top exit
-    - backward loop with node below → left exit + left channel (avoid cutting through stacked lane nodes)
-    - obstacle bypass if a segment still hits a node
-    - dock spreading + straight snap for near-horizontal links
+## XML / layout rules
+See README. Key: `laneId` input-only; lanes inset for headers; orthogonal edge router in `src/utils/edge-router.ts`.
 
 ## Scripts
-- `npm test` — vitest
-- `npm run local` — advanced order process with lanes
-- `npm run example:lanes` / `example:simple`
-
-## Docs
-- README covers lanes, API, validation, layout, examples; screenshot in `assets/advanced-order-process.png`.
+- `npm test` / `npm run local` / `npm run example:*` / `npm run build`

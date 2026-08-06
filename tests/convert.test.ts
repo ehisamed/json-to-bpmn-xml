@@ -1,6 +1,7 @@
-import { convert } from "../index";
-import { ProcessModel } from "../types/process";
+import { convert } from "../src/index";
+import type { ProcessModel } from "../src/types/process";
 import { describe, it, expect } from "vitest";
+import { advancedOrder, lanesSimpleFlow } from "../fixtures/models";
 
 describe("convert()", () => {
   const model: ProcessModel = {
@@ -44,43 +45,26 @@ describe("convert()", () => {
   });
 
   it("generates clean XML with lanes, collaboration and laneSet", async () => {
-    const withLanes: ProcessModel = {
-      id: "process_lanes",
-      name: "Lane Process",
-      lanes: [
-        { id: "Lane_A", name: "User" },
-        { id: "Lane_B", name: "System" },
-      ],
-      nodes: [
-        { id: "start", type: "start", laneId: "Lane_A" },
-        { id: "task1", type: "userTask", name: "Fill form", laneId: "Lane_A" },
-        {
-          id: "task2",
-          type: "serviceTask",
-          name: "Process",
-          laneId: "Lane_B",
-        },
-        { id: "end", type: "end", laneId: "Lane_B" },
-      ],
-      edges: [
-        { id: "e1", source: "start", target: "task1" },
-        { id: "e2", source: "task1", target: "task2" },
-        { id: "e3", source: "task2", target: "end" },
-      ],
-    };
-
-    const xml = await convert(withLanes);
+    const xml = await convert(lanesSimpleFlow);
 
     expect(xml).toContain("<bpmn:laneSet");
-    expect(xml).toContain('<bpmn:lane id="Lane_A" name="User">');
-    expect(xml).toContain("<bpmn:flowNodeRef>start</bpmn:flowNodeRef>");
-    expect(xml).toContain("<bpmn:flowNodeRef>task1</bpmn:flowNodeRef>");
+    expect(xml).toContain('<bpmn:lane id="Lane_User" name="User">');
+    expect(xml).toContain("<bpmn:flowNodeRef>Start_1</bpmn:flowNodeRef>");
     expect(xml).toContain("<bpmn:collaboration");
-    expect(xml).toContain('bpmnElement="Lane_A"');
+    expect(xml).toContain('bpmnElement="Lane_User"');
     expect(xml).not.toContain("laneId=");
     expect(xml).toContain(
       'xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd"',
     );
+  });
+
+  it("converts the advanced order fixture", async () => {
+    const xml = await convert(advancedOrder);
+
+    expect(xml).toContain('id="Process_Advanced_Order"');
+    expect(xml).toContain("<bpmn:exclusiveGateway");
+    expect(xml).toContain("<bpmn:laneSet");
+    expect(xml).not.toContain("laneId=");
   });
 
   it("throws on unknown laneId", async () => {
