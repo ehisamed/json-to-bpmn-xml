@@ -1,4 +1,4 @@
-import { convert, ProcessModel } from "src";
+import { convert, type ProcessModel } from "../index";
 
 // Flow: Start → User Task → Service Task → Exclusive Gateway → Service Task → End
 // Пользователь → Система → Внешний сервис → Система

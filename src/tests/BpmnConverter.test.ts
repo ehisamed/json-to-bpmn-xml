@@ -23,7 +23,33 @@ describe("BpmnConverter", () => {
     const xml = await converter.convert(model);
 
     expect(xml).toContain("<bpmn:process");
-    expect(xml).toContain("isExecutable=\"false\"");
-    expect(xml).toContain("bpmnElement=\"start\"");
+    expect(xml).toContain('isExecutable="false"');
+    expect(xml).toContain('bpmnElement="start"');
+    expect(xml).toContain("<bpmndi:BPMNDiagram");
+    expect(xml).toContain("<di:waypoint");
+  });
+
+  it("supports exclusive and parallel gateways", async () => {
+    const converter = new BpmnConverter();
+
+    const model: ProcessModel = {
+      id: "process_gw",
+      nodes: [
+        { id: "start", type: "start" },
+        { id: "xor", type: "exclusiveGateway", name: "Xor" },
+        { id: "and", type: "parallelGateway", name: "And" },
+        { id: "end", type: "end" },
+      ],
+      edges: [
+        { id: "e1", source: "start", target: "xor" },
+        { id: "e2", source: "xor", target: "and" },
+        { id: "e3", source: "and", target: "end" },
+      ],
+    };
+
+    const xml = await converter.convert(model);
+
+    expect(xml).toContain("<bpmn:exclusiveGateway");
+    expect(xml).toContain("<bpmn:parallelGateway");
   });
 });

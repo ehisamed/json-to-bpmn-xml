@@ -3,13 +3,27 @@ import type { BPMNModdle } from "bpmn-moddle";
 export class ProcessBuilder {
   constructor(private moddle: BPMNModdle) {}
 
-  build(id: string, name: string | undefined, elements: any[], flows: any[], laneSets?: any[]) {
-    return this.moddle.create("bpmn:Process", {
+  build(
+    id: string,
+    name: string | undefined,
+    elements: any[],
+    flows: any[],
+    laneSets?: any[],
+  ) {
+    const attrs: Record<string, unknown> = {
       id,
-      name,
       isExecutable: false,
       flowElements: [...elements, ...flows],
-      laneSets: laneSets || [],
-    })
+    };
+
+    if (name !== undefined) {
+      attrs.name = name;
+    }
+
+    if (laneSets?.length) {
+      attrs.laneSets = laneSets;
+    }
+
+    return this.moddle.create("bpmn:Process", attrs);
   }
 }

@@ -1,4 +1,4 @@
-import { convert, type ProcessModel } from "json-to-bpmn-xml";
+import { convert, type ProcessModel } from "../src/index";
 
 const model: ProcessModel = {
   id: "process_gateway",

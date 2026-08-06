@@ -15,12 +15,17 @@ export class FlowBuilder {
     const source = elementById.get(String(edge.source));
     const target = elementById.get(String(edge.target));
 
-    const flow = this.moddle.create("bpmn:SequenceFlow", {
+    const attrs: Record<string, unknown> = {
       id: edge.id ?? `Flow_${index + 1}`,
-      name: edge.name,
       sourceRef: source,
       targetRef: target,
-    });
+    };
+
+    if (edge.name !== undefined) {
+      attrs.name = edge.name;
+    }
+
+    const flow = this.moddle.create("bpmn:SequenceFlow", attrs);
 
     if (source) {
       source.outgoing = [...(source.outgoing ?? []), flow];

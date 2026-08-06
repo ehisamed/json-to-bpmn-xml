@@ -10,8 +10,11 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "local": "npx tsx src/local-run.ts",
+    "example:simple": "npx tsx example/simple-process.ts",
+    "example:lanes": "npx tsx example/lanes.ts"
   },
   "keywords": [
     "bpmn",
@@ -28,9 +31,7 @@
   },
   "dependencies": {
     "bpmn-moddle": "^10.0.0",
-    "dagre": "^0.8.5",
     "elkjs": "^0.11.1",
-    "json-to-bpmn-xml": "^1.0.2",
     "xml-formatter": "^3.7.0"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
-import { convert } from "src";
-import { ProcessModel } from "./types/process";
+import { convert } from "./index";
+import type { ProcessModel } from "./types/process";
 
 const model: ProcessModel = {
   id: "Process_Advanced_Order",

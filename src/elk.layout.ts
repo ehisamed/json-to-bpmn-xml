@@ -8,16 +8,10 @@ export async function layoutGraph(nodes: any[], edges: any[]) {
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
-      "elk.spacing.nodeNode": "45",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "85",
+      "elk.spacing.nodeNode": "40",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "80",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-      "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
-      "elk.edgeRouting": "SPLINES",
-      "elk.stress.model": "true",
-      "elk.stress.maxIterations": "500",
-      "elk.nodeSize.options": "AUTOMATIC",
-      "elk.edgeBundling": "true",
-      "elk.portAlignment": "CENTER",
+      "elk.edgeRouting": "ORTHOGONAL",
     },
 
     children: nodes.map((node) => ({

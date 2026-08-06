@@ -1,4 +1,4 @@
-import { convert, ProcessModel } from "src";
+import { convert, type ProcessModel } from "../index";
 
 const model: ProcessModel = {
   id: "Process_Test_Lanes",

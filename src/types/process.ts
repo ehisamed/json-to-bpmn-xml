@@ -1,5 +1,5 @@
 import { ILane } from "./lane";
-import { INode } from "./Node";
+import { INode } from "./node";
 import { IEdge } from "./edge";
 
 export interface ProcessModel {

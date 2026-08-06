@@ -1,4 +1,4 @@
-import { convert, ProcessModel } from "src";
+import { convert, type ProcessModel } from "../index";
 
 // Start → User Task → End
 const model: ProcessModel = {

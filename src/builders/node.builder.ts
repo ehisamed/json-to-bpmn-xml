@@ -8,10 +8,14 @@ export class NodeBuilder {
   build(node: INode) {
     const type = NODE_MAP[node.type];
 
-    return this.moddle.create(type, {
+    const attrs: Record<string, string> = {
       id: node.id,
-      name: node.name,
-      laneId: node.laneId,
-    });
+    };
+
+    if (node.name !== undefined) {
+      attrs.name = node.name;
+    }
+
+    return this.moddle.create(type, attrs);
   }
 }

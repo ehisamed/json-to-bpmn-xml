@@ -1,8 +1,11 @@
 import type { BPMNModdle } from "bpmn-moddle";
 import { layoutGraph } from "../elk.layout";
 import type { FlowMeta } from "./flow.builder";
+import type { INode } from "../types/node";
+import type { ILane } from "../types/lane";
 
-const NODE_INSIDE_LANE_MARGIN = 40;
+type Bounds = { x: number; y: number; width: number; height: number };
+type Point = { x: number; y: number };
 
 const NODE_SIZE = {
   default: { width: 100, height: 80 },
@@ -11,211 +14,422 @@ const NODE_SIZE = {
   gateway: { width: 50, height: 50 },
 };
 
+/** Left strip for pool (participant) title — lanes must start after this. */
+const POOL_HEADER_WIDTH = 30;
+/** Left strip inside each lane for lane title. */
+const LANE_HEADER_WIDTH = 30;
+
+const POOL_OFFSET_X = 160;
+const POOL_OFFSET_Y = 80;
+const NODE_IN_LANE_MARGIN_X = 40;
+const NODE_IN_LANE_PADDING_Y = 40;
+const DEFAULT_LANE_HEIGHT = 180;
+const CONTENT_PADDING = 80;
+const BACKWARD_EDGE_GAP = 40;
+
 function getBounds(type: string) {
-  if (type === "bpmn:StartEvent" || type === "bpmn:EndEvent")
+  if (type === "bpmn:StartEvent" || type === "bpmn:EndEvent") {
     return NODE_SIZE.start;
-  if (type.endsWith("Gateway")) return NODE_SIZE.gateway;
+  }
+
+  if (type.endsWith("Gateway")) {
+    return NODE_SIZE.gateway;
+  }
+
   return NODE_SIZE.default;
+}
+
+function center(b: Bounds): Point {
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}
+
+function dedupePoints(points: Point[]): Point[] {
+  return points.filter((point, index) => {
+    if (index === 0) return true;
+    const prev = points[index - 1]!;
+    return (
+      Math.abs(point.x - prev.x) > 0.5 || Math.abs(point.y - prev.y) > 0.5
+    );
+  });
+}
+
+/**
+ * Build orthogonal (Manhattan) waypoints between two placed shapes.
+ * Uses border attachment points so edges do not cut through nodes.
+ */
+function orthogonalWaypoints(source: Bounds, target: Bounds): Point[] {
+  const sc = center(source);
+  const tc = center(target);
+  const dx = tc.x - sc.x;
+  const dy = tc.y - sc.y;
+
+  let from: Point;
+  let to: Point;
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if (dx >= 0) {
+      from = { x: source.x + source.width, y: sc.y };
+      to = { x: target.x, y: tc.y };
+    } else {
+      from = { x: source.x, y: sc.y };
+      to = { x: target.x + target.width, y: tc.y };
+    }
+  } else if (dy >= 0) {
+    from = { x: sc.x, y: source.y + source.height };
+    to = { x: tc.x, y: target.y };
+  } else {
+    from = { x: sc.x, y: source.y };
+    to = { x: tc.x, y: target.y + target.height };
+  }
+
+  // Same row / column — straight segment.
+  if (Math.abs(from.y - to.y) < 1) {
+    return dedupePoints([from, { x: to.x, y: from.y }]);
+  }
+  if (Math.abs(from.x - to.x) < 1) {
+    return dedupePoints([from, { x: from.x, y: to.y }]);
+  }
+
+  // Forward (left → right): mid-X elbow.
+  if (to.x >= from.x) {
+    const midX = Math.round((from.x + to.x) / 2);
+    return dedupePoints([
+      from,
+      { x: midX, y: from.y },
+      { x: midX, y: to.y },
+      to,
+    ]);
+  }
+
+  // Backward / loop: route below or above to avoid crossing mid-nodes.
+  const goBelow = dy >= 0;
+  const bypassY = goBelow
+    ? Math.max(from.y, to.y) + BACKWARD_EDGE_GAP
+    : Math.min(from.y, to.y) - BACKWARD_EDGE_GAP;
+
+  // Prefer leaving vertically when source is to the right of target.
+  const leave: Point =
+    Math.abs(dx) >= Math.abs(dy)
+      ? { x: from.x, y: bypassY }
+      : from.y === source.y || from.y === source.y + source.height
+        ? { x: from.x, y: bypassY }
+        : { x: from.x, y: bypassY };
+
+  return dedupePoints([
+    from,
+    leave,
+    { x: to.x, y: leave.y },
+    to,
+  ]);
+}
+
+/**
+ * Orthogonal waypoints from ELK edge geometry (no-lane mode).
+ */
+function elkWaypoints(section: any): Point[] {
+  const raw = [
+    section.startPoint,
+    ...(section.bendPoints ?? []),
+    section.endPoint,
+  ]
+    .filter(
+      (point: any) =>
+        point &&
+        point.x !== undefined &&
+        point.y !== undefined &&
+        !Number.isNaN(Number(point.x)) &&
+        !Number.isNaN(Number(point.y)),
+    )
+    .map((point: any) => ({
+      x: Number(point.x),
+      y: Number(point.y),
+    }));
+
+  return dedupePoints(raw);
 }
 
 export class DiagramBuilder {
   constructor(private moddle: BPMNModdle) {}
 
-  async build(
-    collaboration: any,
-    process: any,
-    elements: any[],
-    flows: FlowMeta[],
-    lanes: any[],
-    sourceNodes: any[],
-  ) {
-    const OFFSET_X = 150;
-    const OFFSET_Y = 120;
+  async build(options: {
+    process: any;
+    collaboration?: any | null;
+    elements: any[];
+    flows: FlowMeta[];
+    laneElements: any[];
+    sourceLanes: ILane[];
+    sourceNodes: INode[];
+  }) {
+    const {
+      process,
+      collaboration,
+      elements,
+      flows,
+      laneElements,
+      sourceLanes,
+      sourceNodes,
+    } = options;
 
-    // =========================
-    // 1. ELK INPUT (ONLY NODES)
-    // =========================
+    const hasLanes = sourceLanes.length > 0 && laneElements.length > 0;
+
     const nodes = elements.map((el) => {
-      const b = getBounds(el.$type);
+      const bounds = getBounds(el.$type);
       return {
-        id: el.id,
-        width: b.width,
-        height: b.height,
+        id: String(el.id),
+        width: bounds.width,
+        height: bounds.height,
       };
     });
 
-    const edges = flows.map((f) => ({
-      id: f.id,
-      source: f.source,
-      target: f.target,
+    const edges = flows.map((flow) => ({
+      id: String(flow.id),
+      source: String(flow.source),
+      target: String(flow.target),
     }));
 
     const layout = await layoutGraph(nodes, edges);
 
     const nodeMap = new Map<string, any>();
+    for (const child of layout.children ?? []) {
+      if (child?.id) nodeMap.set(String(child.id), child);
+    }
 
-    const walk = (n: any) => {
-      if (!n) return;
-      if (n.children) n.children.forEach(walk);
-      if (n.id) nodeMap.set(String(n.id), n);
-    };
+    if (!hasLanes) {
+      return this.buildWithoutLanes(process, elements, flows, nodeMap, layout);
+    }
 
-    walk(layout);
-
-    // =========================
-    // 2. LANE HEIGHTS & OFFSETS
-    // =========================
-    const DEFAULT_LANE_HEIGHT = 200;
-
-    const laneIndexById = new Map(
-      lanes.map((lane: any, index: number) => [lane.id, index]),
-    );
-
-    const laneBottomsById = new Map(
-      lanes.map((lane: any) => [lane.id, [] as number[]]),
-    );
-
-    sourceNodes.forEach((node: any) => {
-      const laneId = node.laneId ?? "";
-      const pos = nodeMap.get(node.id);
-      if (!pos) return;
-
-      laneBottomsById.get(laneId)?.push(pos.y + pos.height + NODE_INSIDE_LANE_MARGIN);
+    return this.buildWithLanes({
+      collaboration,
+      elements,
+      flows,
+      laneElements,
+      sourceLanes,
+      sourceNodes,
+      nodeMap,
     });
+  }
 
-    const laneHeights = lanes.map((lane: any) => {
-      const bottoms = laneBottomsById.get(lane.id) ?? [];
-      return Math.max(DEFAULT_LANE_HEIGHT, ...(bottoms.length ? bottoms : [0]));
-    });
+  private buildWithoutLanes(
+    process: any,
+    elements: any[],
+    flows: FlowMeta[],
+    nodeMap: Map<string, any>,
+    layout: any,
+  ) {
+    const positionByNodeId = new Map<string, Bounds>();
 
-    const laneOffsets = laneHeights.reduce<number[]>((offsets, _, index) => {
-      offsets[index] =
-        index === 0 ? 0 : offsets[index - 1] + laneHeights[index - 1];
-      return offsets;
-    }, []);
-
-    const laneOffsetByNodeId = new Map(
-      sourceNodes.map((node: any) => [
-        node.id,
-        laneOffsets[laneIndexById.get(node.laneId ?? "") ?? 0] ?? 0,
-      ]),
-    );
-
-    // =========================
-    // 3. NODE SHAPES
-    // =========================
     const shapes = elements
-      .map((el) => {
-        const pos = nodeMap.get(el.id);
+      .map((element) => {
+        const pos = nodeMap.get(String(element.id));
         if (!pos) return null;
 
-        const laneOffset = laneOffsetByNodeId.get(el.id) ?? 0;
+        const bounds: Bounds = {
+          x: Number(pos.x ?? 0),
+          y: Number(pos.y ?? 0),
+          width: Number(pos.width ?? NODE_SIZE.default.width),
+          height: Number(pos.height ?? NODE_SIZE.default.height),
+        };
+        positionByNodeId.set(String(element.id), bounds);
 
         return this.moddle.create("bpmndi:BPMNShape", {
-          id: `${el.id}_di`,
-          bpmnElement: el,
-          bounds: this.moddle.create("dc:Bounds", {
-            x: pos.x + OFFSET_X + NODE_INSIDE_LANE_MARGIN,
-            y: pos.y + OFFSET_Y + laneOffset + NODE_INSIDE_LANE_MARGIN,
-            width: pos.width,
-            height: pos.height,
-          }),
+          id: `${element.id}_di`,
+          bpmnElement: element,
+          bounds: this.moddle.create("dc:Bounds", bounds),
         });
       })
       .filter(Boolean);
 
-    // =========================
-    // 4. PARTICIPANT (WRAPPER)
-    // =========================
-    const participant = collaboration.participants?.[0];
-    const totalLaneHeight =
-      laneOffsets.length > 0
-        ? laneOffsets[laneOffsets.length - 1] + laneHeights[laneHeights.length - 1]
-        : DEFAULT_LANE_HEIGHT;
+    const flowById = new Map(flows.map((f) => [f.id, f]));
+    const edgesDi = (layout.edges ?? [])
+      .map((edge: any) => {
+        const meta =
+          flowById.get(String(edge.id)) ??
+          flows.find(
+            (f) =>
+              f.source === String(edge.sources?.[0]) &&
+              f.target === String(edge.targets?.[0]),
+          );
+        if (!meta?.flow) return null;
 
+        const section = edge.sections?.[0];
+        let points =
+          section && elkWaypoints(section).length >= 2
+            ? elkWaypoints(section)
+            : null;
+
+        if (!points) {
+          const source = positionByNodeId.get(meta.source);
+          const target = positionByNodeId.get(meta.target);
+          if (!source || !target) return null;
+          points = orthogonalWaypoints(source, target);
+        }
+
+        if (points.length < 2) return null;
+
+        return this.moddle.create("bpmndi:BPMNEdge", {
+          id: `${meta.id}_di`,
+          bpmnElement: meta.flow,
+          waypoint: points.map((point) =>
+            this.moddle.create("dc:Point", point),
+          ),
+        });
+      })
+      .filter(Boolean);
+
+    const plane = this.moddle.create("bpmndi:BPMNPlane", {
+      id: "BPMNPlane_1",
+      bpmnElement: process,
+      planeElement: [...shapes, ...edgesDi],
+    });
+
+    return this.moddle.create("bpmndi:BPMNDiagram", {
+      id: "BPMNDiagram_1",
+      plane,
+    });
+  }
+
+  private buildWithLanes(args: {
+    collaboration: any;
+    elements: any[];
+    flows: FlowMeta[];
+    laneElements: any[];
+    sourceLanes: ILane[];
+    sourceNodes: INode[];
+    nodeMap: Map<string, any>;
+  }) {
+    const {
+      collaboration,
+      elements,
+      flows,
+      laneElements,
+      sourceLanes,
+      sourceNodes,
+      nodeMap,
+    } = args;
+
+    const laneIndexById = new Map(
+      sourceLanes.map((lane, index) => [lane.id, index]),
+    );
+
+    // Uniform lane height: tall enough for the tallest node + padding.
+    // Nodes are vertically centered — keeps cross-lane edges clean.
+    let maxNodeHeight = NODE_SIZE.default.height;
+    for (const child of nodeMap.values()) {
+      maxNodeHeight = Math.max(
+        maxNodeHeight,
+        Number(child.height ?? NODE_SIZE.default.height),
+      );
+    }
+
+    const laneHeight = Math.max(
+      DEFAULT_LANE_HEIGHT,
+      maxNodeHeight + NODE_IN_LANE_PADDING_Y * 2,
+    );
+    const laneHeights = sourceLanes.map(() => laneHeight);
+    const laneOffsets = laneHeights.reduce<number[]>((offsets, _, index) => {
+      offsets[index] =
+        index === 0 ? 0 : offsets[index - 1]! + laneHeights[index - 1]!;
+      return offsets;
+    }, []);
+
+    const contentOriginX =
+      POOL_OFFSET_X + POOL_HEADER_WIDTH + LANE_HEADER_WIDTH + NODE_IN_LANE_MARGIN_X;
+
+    const positionByNodeId = new Map<string, Bounds>();
+
+    for (const element of elements) {
+      const pos = nodeMap.get(String(element.id));
+      if (!pos) continue;
+
+      const sourceNode = sourceNodes.find((n) => n.id === element.id);
+      const laneId = sourceNode?.laneId ?? sourceLanes[0]?.id ?? "";
+      const laneIndex = laneIndexById.get(laneId) ?? 0;
+      const width = Number(pos.width ?? NODE_SIZE.default.width);
+      const height = Number(pos.height ?? NODE_SIZE.default.height);
+      const laneTop = POOL_OFFSET_Y + (laneOffsets[laneIndex] ?? 0);
+
+      positionByNodeId.set(String(element.id), {
+        x: contentOriginX + Number(pos.x ?? 0),
+        y: laneTop + (laneHeight - height) / 2,
+        width,
+        height,
+      });
+    }
+
+    const shapes = elements
+      .map((element) => {
+        const pos = positionByNodeId.get(String(element.id));
+        if (!pos) return null;
+
+        return this.moddle.create("bpmndi:BPMNShape", {
+          id: `${element.id}_di`,
+          bpmnElement: element,
+          bounds: this.moddle.create("dc:Bounds", pos),
+        });
+      })
+      .filter(Boolean);
+
+    let maxRight = POOL_OFFSET_X + 600;
+    for (const pos of positionByNodeId.values()) {
+      maxRight = Math.max(maxRight, pos.x + pos.width + CONTENT_PADDING);
+    }
+
+    const poolWidth = maxRight - POOL_OFFSET_X;
+    const totalLaneHeight = laneHeight * sourceLanes.length;
+
+    const participant = collaboration?.participants?.[0];
     const participantShape = participant
       ? this.moddle.create("bpmndi:BPMNShape", {
           id: `${participant.id}_di`,
           bpmnElement: participant,
           isHorizontal: true,
           bounds: this.moddle.create("dc:Bounds", {
-            x: OFFSET_X,
-            y: OFFSET_Y,
-            width: 1200,
-            height: Math.max(600, totalLaneHeight),
+            x: POOL_OFFSET_X,
+            y: POOL_OFFSET_Y,
+            width: poolWidth,
+            height: totalLaneHeight,
           }),
         })
       : null;
 
-    // =========================
-    // 5. LANES
-    // =========================
-    const laneShapes = lanes.map((lane: any, index: number) => {
-      return this.moddle.create("bpmndi:BPMNShape", {
+    // Lanes are inset by POOL_HEADER_WIDTH so pool title and lane titles
+    // do not occupy the same vertical strip (bpmn.io / Camunda convention).
+    const laneShapes = laneElements.map((lane, index) =>
+      this.moddle.create("bpmndi:BPMNShape", {
         id: `${lane.id}_di`,
         bpmnElement: lane,
         isHorizontal: true,
         bounds: this.moddle.create("dc:Bounds", {
-          x: OFFSET_X,
-          y: OFFSET_Y + laneOffsets[index],
-          width: 1200,
-          height: laneHeights[index],
+          x: POOL_OFFSET_X + POOL_HEADER_WIDTH,
+          y: POOL_OFFSET_Y + (laneOffsets[index] ?? 0),
+          width: poolWidth - POOL_HEADER_WIDTH,
+          height: laneHeights[index] ?? laneHeight,
         }),
-      });
-    });
+      }),
+    );
 
-    // =========================
-    // 6. EDGES
-    // =========================
-    const flowById = new Map(flows.map((f) => [f.id, f.flow]));
+    const edgesDi = flows
+      .map((meta) => {
+        const source = positionByNodeId.get(meta.source);
+        const target = positionByNodeId.get(meta.target);
+        if (!source || !target || !meta.flow) return null;
 
-    const edgesDi = (layout.edges ?? [])
-      .map((edge: any) => {
-        const s = edge.sections?.[0];
-        if (!s) return null;
-
-        const sourceOffset =
-          laneOffsetByNodeId.get(edge.sources?.[0] ?? "") ?? 0;
-        const targetOffset =
-          laneOffsetByNodeId.get(edge.targets?.[0] ?? "") ?? 0;
-
-        const points = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]
-          .filter(Boolean)
-          .map((p: any, index: number, array: any[]) => {
-            const offset =
-              index === 0
-                ? sourceOffset
-                : index === array.length - 1
-                ? targetOffset
-                : sourceOffset;
-
-            return {
-              x: p.x + OFFSET_X + NODE_INSIDE_LANE_MARGIN,
-              y: p.y + OFFSET_Y + offset + NODE_INSIDE_LANE_MARGIN,
-            };
-          });
-
-        const flow =
-          flowById.get(edge.id) ??
-          flows.find(
-            (f) =>
-              f.source === edge.sources?.[0] &&
-              f.target === edge.targets?.[0],
-          )?.flow;
-
-        if (!flow) return null;
+        const points = orthogonalWaypoints(source, target);
+        if (points.length < 2) return null;
 
         return this.moddle.create("bpmndi:BPMNEdge", {
-          id: `${edge.id}_di`,
-          bpmnElement: flow,
-          waypoint: points.map((p) => this.moddle.create("dc:Point", p)),
+          id: `${meta.id}_di`,
+          bpmnElement: meta.flow,
+          waypoint: points.map((point) =>
+            this.moddle.create("dc:Point", {
+              x: Math.round(point.x),
+              y: Math.round(point.y),
+            }),
+          ),
         });
       })
       .filter(Boolean);
 
-    // =========================
-    // 7. FINAL DIAGRAM
-    // =========================
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
       bpmnElement: collaboration,

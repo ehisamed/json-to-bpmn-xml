@@ -1,4 +1,4 @@
-import { convert, ProcessModel } from "src";
+import { convert, type ProcessModel } from "../index";
 
 // Flow:
 // Start → Create Order → Payment → Gateway (paid?)
