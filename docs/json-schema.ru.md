@@ -464,4 +464,4 @@ type IDataStore = { id: string; name?: string; color?: { stroke?: string; fill?:
 7. При необходимости — **color** на start/end/store.
 8. Вызвать `convert(model)` и открыть XML в [bpmn.io](https://demo.bpmn.io).
 
-Готовые сложные примеры: `fixtures/models/accounts-payable.ts`, `order-fulfillment.ts`, `loan-approval.ts`, `incident-response.ts`.
+Готовые сложные примеры: `fixtures/models/accounts-payable.ts`, `incident-response.ts`, `advanced-order.ts`.

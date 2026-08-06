@@ -130,6 +130,30 @@ function dockPoint(b: Bounds, side: Side, ratio: number): Point {
   }
 }
 
+function hasNodeBetweenVertically(
+  source: Bounds,
+  target: Bounds,
+  boundsById: Map<string, Bounds>,
+  sourceId: string,
+  targetId: string,
+): boolean {
+  const gapTop = Math.min(source.y + source.height, target.y + target.height);
+  const gapBottom = Math.max(source.y, target.y);
+  if (gapBottom <= gapTop) return false;
+
+  const bandLeft = Math.min(source.x, target.x);
+  const bandRight = Math.max(source.x + source.width, target.x + target.width);
+
+  for (const [id, b] of boundsById) {
+    if (id === sourceId || id === targetId) continue;
+    const overlapX =
+      Math.min(bandRight, b.x + b.width) - Math.max(bandLeft, b.x);
+    if (overlapX <= 0) continue;
+    if (b.y < gapBottom && b.y + b.height > gapTop) return true;
+  }
+  return false;
+}
+
 function hasNodeDirectlyBelow(
   source: Bounds,
   boundsById: Map<string, Bounds>,
@@ -203,6 +227,22 @@ export function chooseSides(
 
   const closeX = Math.abs(dx) <= Math.max(source.width, target.width) * 0.75;
   if (closeX) {
+    // Node sitting between two same-column shapes → leave via the side
+    // so the vertical channel does not cut through the middle node.
+    if (
+      options?.boundsById &&
+      options.sourceId &&
+      options.targetId &&
+      hasNodeBetweenVertically(
+        source,
+        target,
+        options.boundsById,
+        options.sourceId,
+        options.targetId,
+      )
+    ) {
+      return dx >= 0 ? ["right", "left"] : ["left", "right"];
+    }
     return dy > 0 ? ["bottom", "top"] : ["top", "bottom"];
   }
 
@@ -398,6 +438,40 @@ function avoidObstacles(
     if (!overlapsX) continue;
     topClearY = Math.min(topClearY, b.y - CHANNEL_GAP);
     bottomClearY = Math.max(bottomClearY, b.y + b.height + CHANNEL_GAP);
+  }
+
+  // Side bypass when a same-column vertical run is blocked by a mid node.
+  {
+    const rightX =
+      Math.max(source.x + source.width, target.x + target.width) + CHANNEL_GAP;
+    const leftX = Math.min(source.x, target.x) - CHANNEL_GAP;
+    const fromRight = {
+      x: source.x + source.width,
+      y: source.y + source.height / 2,
+    };
+    const toRight = {
+      x: target.x + target.width,
+      y: target.y + target.height / 2,
+    };
+    const fromLeft = { x: source.x, y: source.y + source.height / 2 };
+    const toLeft = { x: target.x, y: target.y + target.height / 2 };
+
+    candidates.push(
+      dedupePoints([
+        fromRight,
+        { x: rightX, y: fromRight.y },
+        { x: rightX, y: toRight.y },
+        toRight,
+      ]),
+    );
+    candidates.push(
+      dedupePoints([
+        fromLeft,
+        { x: leftX, y: fromLeft.y },
+        { x: leftX, y: toLeft.y },
+        toLeft,
+      ]),
+    );
   }
 
   if (to.x >= from.x - 2) {

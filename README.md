@@ -137,7 +137,7 @@ npm run local
 # → converts fixtures/models/accounts-payable.ts
 ```
 
-Swap the import in `scripts/local-run.ts` to try `orderFulfillment`, `loanApproval`, `incidentResponse`, etc.
+Swap the import in `scripts/local-run.ts` to try `incidentResponse`, `advancedOrder`, etc.
 
 ## API
 
@@ -358,8 +358,6 @@ npm run build
 | `orderCrossLane` | `order-cross-lane.ts` | Cross-lane flow with gateway |
 | `advancedOrder` | `advanced-order.ts` | Single-pool demo (retry loop, packing, delivery) |
 | `accountsPayable` | `accounts-payable.ts` | **Complex**: 2 pools, lanes, event gateway, messages, data store |
-| `orderFulfillment` | `order-fulfillment.ts` | **Complex**: Customer Service + Warehouse collaboration |
-| `loanApproval` | `loan-approval.ts` | **Complex**: Bank + Credit Bureau collaboration |
 | `incidentResponse` | `incident-response.ts` | **Complex**: Support Desk + Operations collaboration |
 | `processPayable` | `process-payable.ts` | Simplified single-pool payable slice |
 | `schedulePayments` | `schedule-payments.ts` | Simplified schedule-payments slice |
@@ -370,12 +368,11 @@ Switch the model in `scripts/local-run.ts`:
 
 ```typescript
 import { convert } from "../src/index";
-import { orderFulfillment } from "../fixtures/models";
-// import { loanApproval } from "../fixtures/models";
+import { accountsPayable } from "../fixtures/models";
 // import { incidentResponse } from "../fixtures/models";
-// import { accountsPayable } from "../fixtures/models";
+// import { advancedOrder } from "../fixtures/models";
 
-const xml = await convert(orderFulfillment);
+const xml = await convert(accountsPayable);
 console.log(xml);
 ```
 

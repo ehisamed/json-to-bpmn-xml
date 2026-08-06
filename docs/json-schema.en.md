@@ -464,4 +464,4 @@ Exported from the package as `ProcessModel`, `IProcessDef`, `INode`, `IEdge`, `I
 7. Optionally set **color** on starts/ends/stores for bpmn.io styling.
 8. Run `convert(model)` and open XML in [bpmn.io](https://demo.bpmn.io).
 
-Ready-made complex samples: `fixtures/models/accounts-payable.ts`, `order-fulfillment.ts`, `loan-approval.ts`, `incident-response.ts`.
+Ready-made complex samples: `fixtures/models/accounts-payable.ts`, `incident-response.ts`, `advanced-order.ts`.

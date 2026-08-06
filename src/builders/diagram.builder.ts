@@ -834,7 +834,13 @@ export class DiagramBuilder {
     }
   }
 
-  /** Align target under source when sequence flow crosses lanes. */
+  /**
+   * Nudge a pure cross-lane drop (1 out → 1 in) onto the source column
+   * only when ELK already placed both nodes nearly in the same column.
+   *
+   * Full realignment collapses left-to-right chains that zigzag across
+   * lanes (Pack → Deliver → Notify → Success) into one unreadable stack.
+   */
   private alignCrossLaneDrops(
     positions: Map<string, Bounds>,
     flows: FlowMeta[],
@@ -845,13 +851,23 @@ export class DiagramBuilder {
       const s = nodeById.get(flow.source);
       const t = nodeById.get(flow.target);
       if (!s?.laneId || !t?.laneId || s.laneId === t.laneId) continue;
+
+      const outs = flows.filter((f) => f.source === flow.source).length;
+      const inns = flows.filter((f) => f.target === flow.target).length;
+      if (outs !== 1 || inns !== 1) continue;
+
       const sb = positions.get(s.id);
       const tb = positions.get(t.id);
       if (!sb || !tb) continue;
-      const cx = sb.x + sb.width / 2;
+
+      const scx = sb.x + sb.width / 2;
+      const tcx = tb.x + tb.width / 2;
+      // Preserve ELK layer spacing for forward/backward hops.
+      if (Math.abs(scx - tcx) > COLUMN_X_TOLERANCE) continue;
+
       positions.set(t.id, {
         ...tb,
-        x: Math.round(cx - tb.width / 2),
+        x: Math.round(scx - tb.width / 2),
       });
     }
   }
@@ -980,9 +996,10 @@ export class DiagramBuilder {
   }
 
   /**
-   * Group nodes into X-columns within each lane.
-   * Single-node columns sit on the mid-line; multi-node columns stack
-   * with BRANCH_GAP (event-gateway fan-outs). Returns localY from 0.
+   * Place nodes within each lane.
+   * - Default: keep ELK X and relative Y (works for loops / multi-lane order flows).
+   * - Catch-only columns (intermediateCatch sharing X): stack with BRANCH_GAP
+   *   for event-gateway fan-outs; arrangeEventBasedClusters may still override.
    */
   private packColumnsByLane(
     positions: Map<string, Bounds>,
@@ -998,14 +1015,19 @@ export class DiagramBuilder {
     };
 
     const result = new Map<string, Packed[]>();
+    const nodeById = new Map(sourceNodes.map((n) => [n.id, n]));
 
     for (const lane of sourceLanes) {
       const ids = [...positions.keys()].filter((id) => {
-        const node = sourceNodes.find((n) => n.id === id);
+        const node = nodeById.get(id);
         return (node?.laneId ?? sourceLanes[0]!.id) === lane.id;
       });
 
-      // Cluster by X proximity.
+      const minY = ids.reduce((m, id) => {
+        const y = positions.get(id)!.y;
+        return Math.min(m, y);
+      }, Infinity);
+
       const sorted = ids
         .map((id) => ({ id, bounds: positions.get(id)! }))
         .sort((a, b) => a.bounds.x - b.bounds.x);
@@ -1025,50 +1047,45 @@ export class DiagramBuilder {
 
       const packed: Packed[] = [];
       for (const column of columns) {
-        // Preserve ELK vertical order within the column.
         column.sort((a, b) => a.bounds.y - b.bounds.y);
-        const totalH =
-          column.reduce((sum, c) => sum + c.bounds.height, 0) +
-          BRANCH_GAP * Math.max(0, column.length - 1);
+        const allCatch = column.every(
+          (c) => nodeById.get(c.id)?.type === "intermediateCatch",
+        );
 
-        // Align column center to 0-based mid of eventual content band.
-        // We use totalH as content; localY starts at 0 for top of stack.
-        let y = 0;
-        // For single nodes, localY = 0 and lane will center via padding.
-        // For stacks, pack from 0.
-        if (column.length === 1) {
-          // Place single node at localY=0; lane height uses node height —
-          // later we vertically center singles relative to tallest column.
-          packed.push({
-            id: column[0]!.id,
-            x: column[0]!.bounds.x,
-            localY: 0,
-            width: column[0]!.bounds.width,
-            height: column[0]!.bounds.height,
-          });
-        } else {
+        if (allCatch && column.length > 1) {
+          let y = 0;
+          const x = Math.round(
+            column.reduce((s, c) => s + c.bounds.x, 0) / column.length,
+          );
           for (const item of column) {
             packed.push({
               id: item.id,
-              x: Math.round(
-                column.reduce((s, c) => s + c.bounds.x, 0) / column.length,
-              ),
+              x,
               localY: y,
               width: item.bounds.width,
               height: item.bounds.height,
             });
             y += item.bounds.height + BRANCH_GAP;
           }
+        } else {
+          // Preserve ELK geometry within the lane (no forced mid-line stack).
+          for (const item of column) {
+            packed.push({
+              id: item.id,
+              x: item.bounds.x,
+              localY: item.bounds.y - (Number.isFinite(minY) ? minY : 0),
+              width: item.bounds.width,
+              height: item.bounds.height,
+            });
+          }
         }
-        void totalH;
       }
 
-      // Vertically center each column relative to the tallest column in the lane.
+      // Center catch-only stacks against the tallest content in the lane.
       const maxStack = packed.reduce(
         (m, p) => Math.max(m, p.localY + p.height),
         0,
       );
-      // Re-group by column X to center each stack.
       const byCol = new Map<number, Packed[]>();
       for (const p of packed) {
         const key = Math.round(p.x / COLUMN_X_TOLERANCE);
@@ -1076,6 +1093,10 @@ export class DiagramBuilder {
         byCol.get(key)!.push(p);
       }
       for (const group of byCol.values()) {
+        const isCatchStack =
+          group.length > 1 &&
+          group.every((g) => nodeById.get(g.id)?.type === "intermediateCatch");
+        if (!isCatchStack) continue;
         const stackH = Math.max(...group.map((g) => g.localY + g.height));
         const shift = (maxStack - stackH) / 2;
         for (const g of group) g.localY += shift;

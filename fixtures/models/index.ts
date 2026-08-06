@@ -9,6 +9,4 @@ export { advancedOrder } from "./advanced-order";
 export { processPayable } from "./process-payable";
 export { schedulePayments } from "./schedule-payments";
 export { accountsPayable } from "./accounts-payable";
-export { orderFulfillment } from "./order-fulfillment";
-export { loanApproval } from "./loan-approval";
 export { incidentResponse } from "./incident-response";
