@@ -300,6 +300,8 @@ npm run build
 | `lanesSimpleFlow` | `lanes-simple-flow.ts` | Start → task → end in one lane |
 | `orderCrossLane` | `order-cross-lane.ts` | Cross-lane flow with gateway |
 | `advancedOrder` | `advanced-order.ts` | Full demo (retry loop, packing, delivery) |
+| `processPayable` | `process-payable.ts` | Approximated pool from accounts-payable sample BPMN |
+| `schedulePayments` | `schedule-payments.ts` | Approximated second pool from the same sample |
 
 Switch the model in `scripts/local-run.ts`:
 
