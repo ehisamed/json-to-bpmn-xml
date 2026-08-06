@@ -1,14 +1,13 @@
 # Current task
 
-## Status
-Layout aligned with reference `diagram (10).bpmn`:
-- Event-based gateway compass: Timer↑, Approved↓, Rejected→, Failure end above Rejected
-- Shared end for No / Timeout / Failure (no separate Event_No)
-- Cross-lane vertical drop; Schedule Payments bypass above spine
-- Message flows avoid data store
+## Done
+- Layout polish for complex collaborations (generic heuristics)
+- README updated (layout notes + fixtures table)
+- New complex fixtures: `orderFulfillment`, `loanApproval`, `incidentResponse`
+- Smoke tests in `tests/complex-fixtures.test.ts` (25 tests green)
 
-## Verify
+## Try
 ```bash
-npm test && npm run local
+npm test
+npm run local   # accountsPayable by default; swap import in scripts/local-run.ts
 ```
-Compare with `~/Downloads/diagram (10).bpmn` in bpmn.io.

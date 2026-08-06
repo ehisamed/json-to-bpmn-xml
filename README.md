@@ -19,7 +19,7 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 - **Multi-instance** loops (parallel or sequential)
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores** + data input/output associations
-- **Auto layout** (ELK + orthogonal edge routing)
+- **Auto layout** (ELK + orthogonal edge routing, including event-gateway “compass” clusters)
 - **Validation** of the input model
 - **TypeScript** types + **ESM**
 
@@ -113,13 +113,25 @@ const xml = await convert(model);
 
 ### Advanced example (gateway + loop + cross-lane)
 
-Use the `advancedOrder` fixture:
+Use the `advancedOrder` fixture (single pool, three lanes, retry loop):
+
+```typescript
+import { convert } from "json-to-bpmn-xml";
+import { advancedOrder } from "./fixtures/models"; // in this repo
+
+const xml = await convert(advancedOrder);
+```
+
+### Collaboration example (two pools)
+
+`accountsPayable` is the full Accounts Payable sample: Finance + CFO lanes, Schedule Payments pool, event-based gateway, message flows, and a shared data store.
 
 ```bash
 npm run local
+# → converts fixtures/models/accounts-payable.ts
 ```
 
-It lives in `fixtures/models/advanced-order.ts` and produces a multi-lane order process (User / System / External Service) with an exclusive gateway, retry loop, and two end events — the screenshot at the top of this README.
+Swap the import in `scripts/local-run.ts` to try `orderFulfillment`, `loanApproval`, `incidentResponse`, etc.
 
 ## API
 
@@ -194,14 +206,14 @@ type INode = {
 };
 ```
 
-### Local run (accounts payable sample)
+### Local run
 
 ```bash
 npm run local
-# → converts fixtures/models/accounts-payable.ts
+# → converts fixtures/models/accounts-payable.ts by default
 ```
 
-Swap the import in `scripts/local-run.ts` to any other fixture.
+Edit `scripts/local-run.ts` to import any fixture from `fixtures/models`.
 
 ## Output
 
@@ -272,14 +284,17 @@ Diagram plane is bound to the **collaboration**. Participant and lane shapes use
 | Mode | Behavior |
 | ---- | -------- |
 | **No lanes** | ELK layered layout; plane → process |
-| **With lanes** | ELK for horizontal order; nodes vertically centered in equal-height lanes; plane → collaboration |
+| **With lanes** | ELK for horizontal order; column packing in lanes; plane → collaboration |
+| **Multi-pool** | Pools stacked vertically; data stores sit in the inter-pool gap |
 
-**Edge routing** (especially with lanes):
+**Edge routing** (generic heuristics, not diagram-specific):
 
 - Orthogonal (90°) waypoints only
-- Forward cross-lane links: side docks (`right` → `left`) with a vertical segment in the gap
-- Upward branches (e.g. gateway → upper lane): exit from the **top**
-- Backward loops: route around stacked nodes; approach the target dock **from outside** the shape (no arrows ending inside a task)
+- Forward cross-lane links: side docks (`right` → `left`) or vertical drop when aligned
+- Long skip / bypass edges: clear channel above obstacles, enter target from the **top**
+- Backward loops: route around stacked nodes; approach the dock **from outside** the shape
+- **Event-based gateway**: timer catch above, first message below, further messages to the right (compass cluster); shared failure ends stack above the side message
+- **Message flows / data associations**: bridge routing through the pool gap, avoiding data-store boxes
 - Multiple flows on the same side of a node may share that side (valid BPMN)
 
 Coordinates are deterministic for a given model (good for tests / snapshots). Exact numbers can change if layout constants or ELK options change.
@@ -291,7 +306,8 @@ npm run example:simple    # process without lanes
 npm run example:lanes     # three lanes
 npm run example:gateway   # exclusive gateway
 npm run example:service   # service task
-npm run local             # advanced order fixture (edit scripts/local-run.ts to switch models)
+npm run example:accounts  # accounts payable collaboration
+npm run local             # default: accounts-payable fixture (edit script to switch)
 npm test
 npm run build
 ```
@@ -311,19 +327,26 @@ npm run build
 | `lanesSingleNode` | `lanes-single-node.ts` | Three lanes, one start event |
 | `lanesSimpleFlow` | `lanes-simple-flow.ts` | Start → task → end in one lane |
 | `orderCrossLane` | `order-cross-lane.ts` | Cross-lane flow with gateway |
-| `advancedOrder` | `advanced-order.ts` | Full demo (retry loop, packing, delivery) |
-| `accountsPayable` | `accounts-payable.ts` | Full two-pool sample (message flows, events, data store) |
-| `processPayable` | `process-payable.ts` | Approximated single-pool variant |
-| `schedulePayments` | `schedule-payments.ts` | Approximated second-pool variant |
+| `advancedOrder` | `advanced-order.ts` | Single-pool demo (retry loop, packing, delivery) |
+| `accountsPayable` | `accounts-payable.ts` | **Complex**: 2 pools, lanes, event gateway, messages, data store |
+| `orderFulfillment` | `order-fulfillment.ts` | **Complex**: Customer Service + Warehouse collaboration |
+| `loanApproval` | `loan-approval.ts` | **Complex**: Bank + Credit Bureau collaboration |
+| `incidentResponse` | `incident-response.ts` | **Complex**: Support Desk + Operations collaboration |
+| `processPayable` | `process-payable.ts` | Simplified single-pool payable slice |
+| `schedulePayments` | `schedule-payments.ts` | Simplified schedule-payments slice |
+
+Complex fixtures share the same patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass (`NO` over the main spine), message flows, and a shared data store.
 
 Switch the model in `scripts/local-run.ts`:
 
 ```typescript
 import { convert } from "../src/index";
-import { advancedOrder } from "../fixtures/models";
-// import { lanesSimpleFlow } from "../fixtures/models";
+import { orderFulfillment } from "../fixtures/models";
+// import { loanApproval } from "../fixtures/models";
+// import { incidentResponse } from "../fixtures/models";
+// import { accountsPayable } from "../fixtures/models";
 
-const xml = await convert(advancedOrder);
+const xml = await convert(orderFulfillment);
 console.log(xml);
 ```
 
