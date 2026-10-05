@@ -216,5 +216,8 @@ describe("layout case fixtures", () => {
     expect(xml).toContain("<bpmn:cancelEventDefinition");
     expect(xml).toContain("<bpmn:compensateEventDefinition");
     expect(xml).toContain("<bpmn:linkEventDefinition");
+    expect(xml).toContain('<bpmn:intermediateCatchEvent id="MultipleWait"');
+    expect(xml).toContain('id="MultipleWait_timerDef_1"');
+    expect(xml).toContain('id="MultipleWait_messageDef_2"');
   });
 });

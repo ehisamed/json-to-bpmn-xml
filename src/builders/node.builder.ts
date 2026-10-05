@@ -43,7 +43,7 @@ export class NodeBuilder {
         node.type === "end" ||
         node.type === "intermediateCatch" ||
         node.type === "boundaryEvent") &&
-      node.eventDefinition
+      (node.eventDefinition || node.eventDefinitions?.length)
     ) {
       const defTypeByEvent = {
         timer: "bpmn:TimerEventDefinition",
@@ -57,13 +57,16 @@ export class NodeBuilder {
         compensation: "bpmn:CompensateEventDefinition",
         link: "bpmn:LinkEventDefinition",
       } as const;
-      const defType = defTypeByEvent[node.eventDefinition];
-
-      attrs.eventDefinitions = [
-        this.moddle.create(defType, {
-          id: `${node.id}_${node.eventDefinition}Def`,
+      const definitions = node.eventDefinitions?.length
+        ? node.eventDefinitions
+        : node.eventDefinition
+          ? [node.eventDefinition]
+          : [];
+      attrs.eventDefinitions = definitions.map((eventDefinition, index) =>
+        this.moddle.create(defTypeByEvent[eventDefinition], {
+          id: `${node.id}_${eventDefinition}Def${definitions.length > 1 ? `_${index + 1}` : ""}`,
         }),
-      ];
+      );
     }
 
     if (node.multiInstance !== undefined && node.multiInstance !== false) {

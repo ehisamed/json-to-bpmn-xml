@@ -54,6 +54,9 @@ export interface INode {
   /** For `start` / `intermediateCatch` — timer or message catch. */
   eventDefinition?: EventDefinition;
 
+  /** Multiple event definitions on one event, such as timer OR message. */
+  eventDefinitions?: EventDefinition[];
+
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
 

@@ -10,7 +10,12 @@ export const controlEvents: ProcessModel = {
     { id: "UndoReservation", type: "intermediateCatch", name: "Undo reservation", eventDefinition: "compensation" },
     { id: "LinkCatch", type: "intermediateCatch", name: "Continue", eventDefinition: "link" },
     { id: "Notify", type: "serviceTask", name: "Notify customer" },
-    { id: "MultipleWait", type: "intermediateCatch", name: "Continue after control event" },
+    {
+      id: "MultipleWait",
+      type: "intermediateCatch",
+      name: "Continue after timer or message",
+      eventDefinitions: ["timer", "message"],
+    },
     { id: "End", type: "end", name: "Complete" },
   ],
   edges: [
