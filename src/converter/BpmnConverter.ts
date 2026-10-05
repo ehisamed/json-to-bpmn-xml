@@ -416,6 +416,40 @@ export class BpmnConverter {
       }
     }
 
+    const linkSources = new Map<string, any>();
+    const linkTargets = new Map<string, any>();
+    for (const node of nodes) {
+      const options = node.eventDefinitionOptions;
+      if (!options?.linkName) continue;
+      const element = elementById.get(node.id) as any;
+      for (const definition of element?.eventDefinitions ?? []) {
+        if (definition.$type !== "bpmn:LinkEventDefinition") continue;
+        const direction =
+          options.linkDirection ??
+          (node.type === "intermediateThrow" ? "source" : "target");
+        const map = direction === "source" ? linkSources : linkTargets;
+        if (map.has(options.linkName)) {
+          throw new Error(
+            `Duplicate ${direction} link event name "${options.linkName}"`,
+          );
+        }
+        map.set(options.linkName, definition);
+      }
+    }
+    for (const [name, source] of linkSources) {
+      const target = linkTargets.get(name);
+      if (!target) {
+        throw new Error(`Link event "${name}" has no target`);
+      }
+      source.target = target;
+      target.source = [source];
+    }
+    for (const name of linkTargets.keys()) {
+      if (!linkSources.has(name)) {
+        throw new Error(`Link event "${name}" has no source`);
+      }
+    }
+
     for (const node of nodes) {
       if (node.type === "boundaryEvent") {
         const boundary = elementById.get(node.id) as any;

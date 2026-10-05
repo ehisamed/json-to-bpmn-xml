@@ -20,6 +20,7 @@ export type NodeType =
   | "complexGateway"
   | "eventBasedGateway"
   | "intermediateCatch"
+  | "intermediateThrow"
   | "boundaryEvent";
 
 /** Event definition attached to supported BPMN events. */
@@ -62,6 +63,8 @@ export interface INode {
   eventDefinitionOptions?: {
     activityRef?: string;
     waitForCompletion?: boolean;
+    linkName?: string;
+    linkDirection?: "source" | "target";
   };
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */

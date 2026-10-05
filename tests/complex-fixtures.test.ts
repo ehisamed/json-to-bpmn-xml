@@ -26,6 +26,7 @@ import {
   controlEvents,
   complexGatewayLoops,
   compensation,
+  linkEvents,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -59,6 +60,7 @@ const layoutFixtures = [
   { name: "controlEvents", model: controlEvents },
   { name: "complexGatewayLoops", model: complexGatewayLoops },
   { name: "compensation", model: compensation },
+  { name: "linkEvents", model: linkEvents },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -239,5 +241,14 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:compensateEventDefinition id="Compensate_compensationDef" waitForCompletion="false"');
     expect(xml).toContain('activityRef="UndoCharge"');
     expect(xml).toContain('attachedToRef="ChargeCard"');
+  });
+
+  it("connects link event definitions by name", async () => {
+    const xml = await convert(linkEvents);
+    expect(xml).toContain('<bpmn:intermediateThrowEvent id="LinkThrow"');
+    expect(xml).toContain('<bpmn:intermediateCatchEvent id="LinkCatch"');
+    expect(xml).toContain('name="ReviewHandoff"');
+    expect(xml).toContain("<bpmn:target>LinkCatch_linkDef</bpmn:target>");
+    expect(xml).toContain("<bpmn:source>LinkThrow_linkDef</bpmn:source>");
   });
 });

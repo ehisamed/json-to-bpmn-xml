@@ -42,6 +42,7 @@ export class NodeBuilder {
       (node.type === "start" ||
         node.type === "end" ||
         node.type === "intermediateCatch" ||
+        node.type === "intermediateThrow" ||
         node.type === "boundaryEvent") &&
       (node.eventDefinition || node.eventDefinitions?.length)
     ) {
@@ -68,6 +69,9 @@ export class NodeBuilder {
           ...(eventDefinition === "compensation" &&
           node.eventDefinitionOptions?.waitForCompletion !== undefined
             ? { waitForCompletion: node.eventDefinitionOptions.waitForCompletion }
+            : {}),
+          ...(eventDefinition === "link" && node.eventDefinitionOptions?.linkName
+            ? { name: node.eventDefinitionOptions.linkName }
             : {}),
         }),
       );
