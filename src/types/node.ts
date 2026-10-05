@@ -1,4 +1,5 @@
 import type { DiColor } from "./di-color";
+import type { IEdge } from "./edge";
 
 export type NodeType =
   | "start"
@@ -17,6 +18,11 @@ export type NodeType =
 /** Event definition attached to start, intermediateCatch, or boundary events. */
 export type EventDefinition = "timer" | "message";
 
+export interface ISubProcessDef {
+  nodes: INode[];
+  edges: IEdge[];
+}
+
 export interface INode {
   id: string;
   type: NodeType;
@@ -30,6 +36,9 @@ export interface INode {
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
+
+  /** Embedded subprocess body. Supported only when `type` is `subProcess`. */
+  subProcess?: ISubProcessDef;
 
   /**
    * Multi-instance loop characteristics.

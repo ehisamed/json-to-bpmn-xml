@@ -1,6 +1,11 @@
 import { BpmnConverter } from "./converter/BpmnConverter";
 import type { ProcessModel, IProcessDef } from "./types/process";
-import type { INode, NodeType, EventDefinition } from "./types/node";
+import type {
+  INode,
+  ISubProcessDef,
+  NodeType,
+  EventDefinition,
+} from "./types/node";
 import type { IEdge } from "./types/edge";
 import type { ILane } from "./types/lane";
 import type { IMessageFlow } from "./types/message-flow";
@@ -24,4 +29,5 @@ export type {
   DiColor,
   NodeType,
   EventDefinition,
+  ISubProcessDef,
 };

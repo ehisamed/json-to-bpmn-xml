@@ -9,6 +9,8 @@ import type { BPMNModdle, FlowNode } from "bpmn-moddle";
 import format from "xml-formatter";
 import { normalizeModel } from "../utils/normalize-model";
 import type { DiColor } from "../types/di-color";
+import type { IEdge } from "../types/edge";
+import type { INode } from "../types/node";
 
 export class BpmnConverter {
   private moddle: BPMNModdle;
@@ -63,29 +65,12 @@ export class BpmnConverter {
     }
 
     for (const processDef of normalized.processes) {
-      const elements = processDef.nodes.map((node) =>
-        this.nodeBuilder.build(node),
-      );
+      const built = this.buildFlowElements(processDef.nodes, processDef.edges);
+      const elements = built.elements;
       for (const node of processDef.nodes) {
         if (node.color) colorsById.set(node.id, node.color);
       }
-      const elementById = new Map(
-        elements.map((el) => [String(el.id), el] as [string, FlowNode]),
-      );
-
-      for (const node of processDef.nodes) {
-        if (node.type !== "boundaryEvent") continue;
-        const boundary = elementById.get(node.id) as any;
-        const attachedTo = node.attachedTo
-          ? elementById.get(node.attachedTo)
-          : undefined;
-        if (!attachedTo) {
-          throw new Error(
-            `Boundary event "${node.id}" references unknown attachedTo "${node.attachedTo ?? ""}"`,
-          );
-        }
-        boundary.attachedToRef = attachedTo;
-      }
+      const elementById = built.elementById;
 
       for (const [id, el] of elementById) {
         globalElementById.set(id, el);
@@ -133,9 +118,7 @@ export class BpmnConverter {
         }
       }
 
-      const flows = processDef.edges.map((edge, index) =>
-        this.flowBuilder.build(edge, elementById, index),
-      );
+      const flows = built.flows;
       const flowMeta = processDef.edges.map((edge, index) =>
         this.flowBuilder.buildMeta(edge, flows[index], index),
       );
@@ -288,6 +271,45 @@ export class BpmnConverter {
     return metas;
   }
 
+  private buildFlowElements(nodes: INode[], edges: IEdge[]) {
+    const elements = nodes.map((node) => this.nodeBuilder.build(node));
+    const elementById = new Map(
+      elements.map((el) => [String(el.id), el] as [string, FlowNode]),
+    );
+
+    for (const node of nodes) {
+      if (node.type === "boundaryEvent") {
+        const boundary = elementById.get(node.id) as any;
+        const attachedTo = node.attachedTo
+          ? elementById.get(node.attachedTo)
+          : undefined;
+        if (!attachedTo) {
+          throw new Error(
+            `Boundary event "${node.id}" references unknown attachedTo "${node.attachedTo ?? ""}"`,
+          );
+        }
+        boundary.attachedToRef = attachedTo;
+      }
+
+      if (node.type === "subProcess" && node.subProcess) {
+        const nested = this.buildFlowElements(
+          node.subProcess.nodes,
+          node.subProcess.edges,
+        );
+        (elementById.get(node.id) as any).flowElements = [
+          ...nested.elements,
+          ...nested.flows,
+        ];
+      }
+    }
+
+    const flows = edges.map((edge, index) =>
+      this.flowBuilder.build(edge, elementById, index),
+    );
+
+    return { elements, elementById, flows };
+  }
+
   private validate(model: ReturnType<typeof normalizeModel>) {
     if (!model.id) {
       throw new Error("ProcessModel.id is required");
@@ -337,6 +359,11 @@ export class BpmnConverter {
       }
 
       for (const node of processDef.nodes) {
+        if (node.subProcess && node.type !== "subProcess") {
+          throw new Error(
+            `Node "${node.id}" defines subProcess content but is not a subProcess`,
+          );
+        }
         if (node.type === "boundaryEvent" && !node.attachedTo) {
           throw new Error(`Boundary event "${node.id}" requires attachedTo`);
         }
@@ -354,6 +381,22 @@ export class BpmnConverter {
               `Node "${node.id}" references unknown data store "${storeId}"`,
             );
           }
+        }
+
+        if (node.subProcess) {
+          if (!node.subProcess.nodes?.length) {
+            throw new Error(`SubProcess "${node.id}" must contain nodes`);
+          }
+          if (!Array.isArray(node.subProcess.edges)) {
+            throw new Error(`SubProcess "${node.id}" edges must be an array`);
+          }
+          this.validateNestedNodes(
+            node.subProcess.nodes,
+            node.subProcess.edges,
+            `SubProcess "${node.id}"`,
+            allNodeIds,
+            dataStoreIds,
+          );
         }
       }
 
@@ -380,6 +423,66 @@ export class BpmnConverter {
       if (!allNodeIds.has(mf.target)) {
         throw new Error(
           `MessageFlow has unknown target "${mf.target}"`,
+        );
+      }
+    }
+  }
+
+  private validateNestedNodes(
+    nodes: INode[],
+    edges: IEdge[],
+    scope: string,
+    allNodeIds: Set<string>,
+    dataStoreIds: Set<string>,
+  ) {
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    if (nodeIds.size !== nodes.length) {
+      throw new Error(`${scope} contains duplicate node ids`);
+    }
+
+    for (const node of nodes) {
+      if (allNodeIds.has(node.id)) {
+        throw new Error(`Duplicate node id across processes: "${node.id}"`);
+      }
+      allNodeIds.add(node.id);
+      if (node.laneId) {
+        throw new Error(
+          `Nested node "${node.id}" cannot reference laneId "${node.laneId}"`,
+        );
+      }
+      if (node.type === "boundaryEvent" && !node.attachedTo) {
+        throw new Error(`Boundary event "${node.id}" requires attachedTo`);
+      }
+      for (const storeId of [
+        ...(node.dataInputs ?? []),
+        ...(node.dataOutputs ?? []),
+      ]) {
+        if (!dataStoreIds.has(storeId)) {
+          throw new Error(
+            `Node "${node.id}" references unknown data store "${storeId}"`,
+          );
+        }
+      }
+      if (node.subProcess) {
+        this.validateNestedNodes(
+          node.subProcess.nodes,
+          node.subProcess.edges,
+          `SubProcess "${node.id}"`,
+          allNodeIds,
+          dataStoreIds,
+        );
+      }
+    }
+
+    for (const edge of edges) {
+      if (!nodeIds.has(edge.source)) {
+        throw new Error(
+          `${scope} edge "${edge.id ?? `${edge.source}->${edge.target}`}" has unknown source "${edge.source}"`,
+        );
+      }
+      if (!nodeIds.has(edge.target)) {
+        throw new Error(
+          `${scope} edge "${edge.id ?? `${edge.source}->${edge.target}`}" has unknown target "${edge.target}"`,
         );
       }
     }

@@ -25,3 +25,4 @@ export { gatewayYesNoCross } from "./gateway-yes-no-cross";
 export { gatewayJoinBypassTop } from "./gateway-join-bypass-top";
 export { boundaryAndConditional } from "./boundary-and-conditional";
 export { inclusiveGateway } from "./inclusive-gateway";
+export { embeddedSubprocess } from "./embedded-subprocess";

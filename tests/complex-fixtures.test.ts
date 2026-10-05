@@ -17,6 +17,7 @@ import {
   gatewayYesNoCross,
   gatewayJoinBypassTop,
   inclusiveGateway,
+  embeddedSubprocess,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -41,6 +42,7 @@ const layoutFixtures = [
   { name: "gatewayYesNoCross", model: gatewayYesNoCross },
   { name: "gatewayJoinBypassTop", model: gatewayJoinBypassTop },
   { name: "inclusiveGateway", model: inclusiveGateway },
+  { name: "embeddedSubprocess", model: embeddedSubprocess },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -127,5 +129,13 @@ describe("layout case fixtures", () => {
     const xml = await convert(subprocessAndMultiInstance);
     expect(xml).toContain("<bpmn:subProcess");
     expect(xml).toContain("<bpmn:multiInstanceLoopCharacteristics");
+  });
+
+  it("serializes embedded subprocess flow elements", async () => {
+    const xml = await convert(embeddedSubprocess);
+    expect(xml).toContain('<bpmn:subProcess id="Verify"');
+    expect(xml).toContain('<bpmn:startEvent id="VerifyStart"');
+    expect(xml).toContain('<bpmn:serviceTask id="CheckIdentity"');
+    expect(xml).toContain('<bpmn:endEvent id="VerifyEnd"');
   });
 });
