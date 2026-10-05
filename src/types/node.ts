@@ -21,6 +21,8 @@ export type EventDefinition = "timer" | "message";
 export interface ISubProcessDef {
   nodes: INode[];
   edges: IEdge[];
+  /** Render the embedded body inside the subprocess shape when true. */
+  expanded?: boolean;
 }
 
 export interface INode {

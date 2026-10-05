@@ -137,5 +137,8 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:startEvent id="VerifyStart"');
     expect(xml).toContain('<bpmn:serviceTask id="CheckIdentity"');
     expect(xml).toContain('<bpmn:endEvent id="VerifyEnd"');
+    expect(xml).toContain('bpmnElement="Verify" isExpanded="true"');
+    expect(xml).toContain('bpmnElement="VerifyStart"');
+    expect(xml).toContain('bpmnElement="VerifyFlow_1"');
   });
 });

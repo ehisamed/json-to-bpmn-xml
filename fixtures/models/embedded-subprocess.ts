@@ -11,6 +11,7 @@ export const embeddedSubprocess: ProcessModel = {
       type: "subProcess",
       name: "Verify customer",
       subProcess: {
+        expanded: true,
         nodes: [
           { id: "VerifyStart", type: "start", name: "Begin checks" },
           { id: "CheckIdentity", type: "serviceTask", name: "Check identity" },
