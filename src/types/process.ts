@@ -3,6 +3,8 @@ import { INode } from "./node";
 import { IEdge } from "./edge";
 import { IMessageFlow } from "./message-flow";
 import { IDataStore } from "./data-store";
+import { IDataObject } from "./data-object";
+import { ITextAnnotation, IGroup, IAssociation } from "./artifact";
 
 /** One process (pool participant) inside a collaboration. */
 export interface IProcessDef {
@@ -40,4 +42,10 @@ export interface ProcessModel {
 
   /** Shared data store references. */
   dataStores?: IDataStore[];
+  /** Data object references shared by process activities. */
+  dataObjects?: IDataObject[];
+  /** BPMN artifacts and associations attached to the process diagram. */
+  textAnnotations?: ITextAnnotation[];
+  groups?: IGroup[];
+  associations?: IAssociation[];
 }

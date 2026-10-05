@@ -11,7 +11,7 @@ The converter turns this structure into **valid BPMN 2.0 XML** (semantics + diag
 
 ## 1. Two modes of the same root object
 
-`ProcessModel` supports two shapes. Internally they are normalized to the same form (`processes[]` + optional `messageFlows` / `dataStores`).
+`ProcessModel` supports two shapes. Internally they are normalized to the same form (`processes[]` + optional message flows, data references, and artifacts).
 
 | Mode | When to use | What you fill |
 | ---- | ----------- | ------------- |
@@ -35,7 +35,10 @@ ProcessModel
 └── [Collaboration]
     ├── processes?
     ├── messageFlows?
-    └── dataStores?
+    ├── dataStores?
+    ├── dataObjects?
+    ├── textAnnotations? / groups?
+    └── associations?
 ```
 
 ---
@@ -52,6 +55,10 @@ ProcessModel
 | `processes` | `IProcessDef[]` | collab: **yes*** | One entry = one pool/process. *Required for multi-pool models. |
 | `messageFlows` | `IMessageFlow[]` | no | Dashed message links **between processes**. |
 | `dataStores` | `IDataStore[]` | no | Shared data store references (cylinders). |
+| `dataObjects` | `IDataObject[]` | no | Document/data object references. |
+| `textAnnotations` | `ITextAnnotation[]` | no | Text annotations. |
+| `groups` | `IGroup[]` | no | BPMN group artifacts. |
+| `associations` | `IAssociation[]` | no | Associations between node/artifact ids. |
 
 ### Why two modes?
 
@@ -63,7 +70,8 @@ ProcessModel
 - No `x` / `y` / waypoints — layout is automatic.
 - No raw BPMN XML fragments.
 - No `laneId` attribute on emitted flow nodes (lanes are only via `laneSet` / `flowNodeRef`).
-- Nested subprocess *contents* are not modeled yet (`subProcess` is collapsed/empty body).
+- Nested subprocess contents use `subProcess.nodes` / `subProcess.edges`; set `expanded: true` for expanded DI.
+- `subProcessType: "event"` emits an event subprocess; `subProcessType: "transaction"` emits a transaction subprocess.
 
 ---
 
@@ -126,10 +134,14 @@ Otherwise (simple process, no lanes) the diagram plane binds to the **process**,
 | `type` | `NodeType` | **yes** | See table below. |
 | `name` | `string` | no | Visible label. |
 | `laneId` | `string` | no | Must exist in the parent process’s `lanes` if set. |
-| `eventDefinition` | `"timer" \| "message"` | conditional | For `start` and `intermediateCatch`. |
-| `multiInstance` | `boolean \| { sequential?: boolean }` | no | Loop marker on tasks / subprocess. |
+| `eventDefinition` | `EventDefinition` | conditional | Single event definition. |
+| `eventDefinitions` | `EventDefinition[]` | no | Multiple definitions on one event. |
+| `eventDefinitionOptions` | object | no | Compensation and link options. |
+| `multiInstance` | `boolean \| object` | no | Loop marker and loop controls. |
 | `dataInputs` | `string[]` | no | Ids from root `dataStores` (read). |
 | `dataOutputs` | `string[]` | no | Ids from root `dataStores` (write). |
+| `dataObjectInputs` | `string[]` | no | Ids from root `dataObjects` (read). |
+| `dataObjectOutputs` | `string[]` | no | Ids from root `dataObjects` (write). |
 | `color` | `DiColor` | no | DI fill/stroke (bpmn.io bioc + color). |
 
 ### `NodeType` → BPMN element
@@ -141,11 +153,14 @@ Otherwise (simple process, no lanes) the diagram plane binds to the **process**,
 | `task` | Task | Generic activity |
 | `userTask` | UserTask | Human task |
 | `serviceTask` | ServiceTask | Automated/service call |
-| `subProcess` | SubProcess | Collapsed subprocess (empty body for now) |
+| `subProcess` | SubProcess / Transaction | Embedded, event, or transaction subprocess |
 | `exclusiveGateway` | ExclusiveGateway | XOR decision / merge |
 | `parallelGateway` | ParallelGateway | AND split / join |
 | `eventBasedGateway` | EventBasedGateway | Wait for first of several catch events |
-| `intermediateCatch` | IntermediateCatchEvent | Catch timer or message mid-flow |
+| `complexGateway` | ComplexGateway | Custom activation/merge logic |
+| `intermediateCatch` | IntermediateCatchEvent | Catch event definitions mid-flow |
+| `intermediateThrow` | IntermediateThrowEvent | Link throw event |
+| `boundaryEvent` | BoundaryEvent | Event attached to an activity |
 
 Unknown `type` values are not allowed (TypeScript + runtime map).
 
@@ -153,8 +168,7 @@ Unknown `type` values are not allowed (TypeScript + runtime map).
 
 | Applies to | Values | Meaning |
 | ---------- | ------ | ------- |
-| `start` | `timer`, `message` | Timer / message start |
-| `intermediateCatch` | `timer`, `message` | **Required in practice** for a meaningful catch; without it the event has no definition |
+| event nodes | `timer`, `message`, `signal`, `conditional`, `error`, `escalation`, `terminate`, `cancel`, `compensation`, `link` | Event definition |
 | Other types | — | Ignored if present |
 
 **Why:** BPMN distinguishes “none” events from timer/message via event definitions, not via separate JSON types for every variant.
@@ -167,6 +181,9 @@ Unknown `type` values are not allowed (TypeScript + runtime map).
 | `true` | Parallel multi-instance (`multiInstanceLoopCharacteristics`) |
 | `{ sequential: true }` | Sequential MI (`isSequential="true"`) |
 | `{ sequential: false }` | Same as parallel |
+| `{ loopCardinality: 3 }` | Loop cardinality expression |
+| `{ completionCondition: "approved >= 2" }` | Stops MI when the expression is true |
+| `{ behavior: "All" \| "One" \| "Complex" }` | BPMN MI completion behavior |
 
 Meaningful on activity-like nodes (`task`, `userTask`, `serviceTask`, `subProcess`). On events/gateways it is unusual; prefer not to set it.
 
@@ -177,6 +194,21 @@ Meaningful on activity-like nodes (`task`, `userTask`, `serviceTask`, `subProces
 - `dataInputs` → `dataInputAssociation` (node reads from store; a placeholder `property` is created for BPMN validity).
 
 **Ownership:** each data store is attached to the **first** process that references it (or the first process if somehow unreferenced). Visually, stores are often placed in the gap between pools.
+
+### `dataObjects`
+
+`dataObjects[]` uses `{ id, name?, isCollection?, color? }`. `dataObjectInputs` and `dataObjectOutputs` create associations to `bpmn:dataObjectReference` elements.
+
+### `eventDefinitionOptions`
+
+- Compensation: `{ activityRef: "UndoCharge", waitForCompletion: false }`.
+- Link: `{ linkName: "ReviewHandoff", linkDirection: "source" | "target" }`. A source and target with the same `linkName` are connected.
+
+### Artifacts
+
+- `textAnnotations[]`: `{ id, text, color? }`.
+- `groups[]`: `{ id, name?, categoryValue?, color? }`.
+- `associations[]`: `{ id, source, target, associationDirection? }`.
 
 ### `color` (`DiColor`)
 
@@ -268,6 +300,8 @@ Emitted as `bpmn:dataStoreReference` (not a full `dataStore` catalog entry). Eno
 | All `nodes[].id` | **Global** across every process |
 | `lanes[].id` | Within one process |
 | `dataStores[].id` | Among data stores |
+| `dataObjects[].id` | Among data objects and data stores |
+| Artifact ids | Among annotations, groups, nodes, and data references |
 | `edges[].id` / `messageFlows[].id` | Should be unique (defaults are index-based) |
 
 **Why global node ids?** Message flows and diagram maps key elements by id across the whole collaboration.
@@ -417,6 +451,10 @@ type ProcessModel = {
   processes?: IProcessDef[];
   messageFlows?: IMessageFlow[];
   dataStores?: IDataStore[];
+  dataObjects?: IDataObject[];
+  textAnnotations?: ITextAnnotation[];
+  groups?: IGroup[];
+  associations?: IAssociation[];
 };
 
 type IProcessDef = {
@@ -433,23 +471,32 @@ type INode = {
   id: string;
   type:
     | "start" | "end" | "task" | "userTask" | "serviceTask" | "subProcess"
-    | "exclusiveGateway" | "parallelGateway" | "eventBasedGateway"
-    | "intermediateCatch";
+    | "exclusiveGateway" | "parallelGateway" | "inclusiveGateway" | "complexGateway"
+    | "eventBasedGateway" | "intermediateCatch" | "intermediateThrow" | "boundaryEvent";
   name?: string;
   laneId?: string;
-  eventDefinition?: "timer" | "message";
-  multiInstance?: boolean | { sequential?: boolean };
+  eventDefinition?: EventDefinition;
+  eventDefinitions?: EventDefinition[];
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target" };
+  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
+  multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
   dataOutputs?: string[];
+  dataObjectInputs?: string[];
+  dataObjectOutputs?: string[];
   color?: { stroke?: string; fill?: string };
 };
 
 type IEdge = { id?: string; source: string; target: string; name?: string };
 type IMessageFlow = { id?: string; source: string; target: string; name?: string };
 type IDataStore = { id: string; name?: string; color?: { stroke?: string; fill?: string } };
+type IDataObject = { id: string; name?: string; isCollection?: boolean; color?: { stroke?: string; fill?: string } };
+type ITextAnnotation = { id: string; text: string; color?: { stroke?: string; fill?: string } };
+type IGroup = { id: string; name?: string; categoryValue?: string; color?: { stroke?: string; fill?: string } };
+type IAssociation = { id: string; source: string; target: string; associationDirection?: "None" | "One" | "Both" };
 ```
 
-Exported from the package as `ProcessModel`, `IProcessDef`, `INode`, `IEdge`, `ILane`, `IMessageFlow`, `IDataStore`, `DiColor`, `NodeType`, `EventDefinition`.
+Exported from the package as `ProcessModel`, `IProcessDef`, `INode`, `IEdge`, `ILane`, `IMessageFlow`, `IDataStore`, `IDataObject`, `ITextAnnotation`, `IGroup`, `IAssociation`, `DiColor`, `NodeType`, `EventDefinition`.
 
 ---
 

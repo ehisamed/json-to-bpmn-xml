@@ -20,11 +20,12 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 
 - **JSON → BPMN 2.0 XML** via [`bpmn-moddle`](https://github.com/bpmn-io/bpmn-moddle)
 - **Pretty-printed XML** with declaration, namespaces, and `xsi:schemaLocation`
-- **Node types**: start/end, task, user/service task, subProcess, exclusive / parallel / event-based gateways, intermediate catch (timer/message)
-- **Event definitions** on start & intermediate catch (`timer` | `message`)
-- **Multi-instance** loops (parallel or sequential)
+- **Node types**: start/end, task variants, expanded/event/transaction subprocesses, standard gateways, intermediate catch/throw and boundary events
+- **Event definitions**: timer, message, signal, conditional, error, escalation, terminate, cancel, compensation, link, and multiple definitions on one event
+- **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
-- **Data stores** + data input/output associations
+- **Data stores and data objects** + data input/output associations
+- **Text annotations, groups, and associations**
 - **Auto layout** (ELK + orthogonal edge routing, including event-gateway “compass” clusters)
 - **DI colors** (`bioc` + `color` extensions, as in bpmn.io)
 - **Validation** of the input model
@@ -42,10 +43,14 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 | `subProcess` | `bpmn:SubProcess` | collapsed (empty body) |
 | `exclusiveGateway` | `bpmn:ExclusiveGateway` | |
 | `parallelGateway` | `bpmn:ParallelGateway` | |
+| `inclusiveGateway` | `bpmn:InclusiveGateway` | |
+| `complexGateway` | `bpmn:ComplexGateway` | |
 | `eventBasedGateway` | `bpmn:EventBasedGateway` | |
-| `intermediateCatch` | `bpmn:IntermediateCatchEvent` | requires `eventDefinition` |
+| `intermediateCatch` | `bpmn:IntermediateCatchEvent` | catch definitions |
+| `intermediateThrow` | `bpmn:IntermediateThrowEvent` | link throw events |
+| `boundaryEvent` | `bpmn:BoundaryEvent` | requires `attachedTo` |
 
-Common node options: `multiInstance`, `dataInputs`, `dataOutputs`, `laneId`.
+Common node options: `multiInstance`, `eventDefinition(s)`, `eventDefinitionOptions`, `dataInputs`, `dataOutputs`, `dataObjectInputs`, `dataObjectOutputs`, `laneId`.
 
 ## Installation
 
@@ -140,6 +145,114 @@ npm run local
 
 Swap the import in `scripts/local-run.ts` to try `incidentResponse`, `advancedOrder`, etc.
 
+## Real BPMN cases
+
+The repository includes executable fixtures for the main patterns used in hand-built BPMN diagrams. Every fixture is converted to XML, parsed back with `bpmn-moddle`, and rendered to PNG.
+
+### Invoice document flow
+
+Use data objects when an activity creates or consumes a document:
+
+```typescript
+const model: ProcessModel = {
+  id: "InvoiceProcess",
+  dataObjects: [
+    { id: "Invoice", name: "Invoice" },
+    { id: "ValidatedInvoice", name: "Validated invoice" },
+  ],
+  nodes: [
+    { id: "start", type: "start" },
+    { id: "receive", type: "receiveTask", name: "Receive invoice", dataObjectOutputs: ["Invoice"] },
+    { id: "validate", type: "serviceTask", name: "Validate", dataObjectInputs: ["Invoice"], dataObjectOutputs: ["ValidatedInvoice"] },
+    { id: "end", type: "end" },
+  ],
+  edges: [
+    { source: "start", target: "receive" },
+    { source: "receive", target: "validate" },
+    { source: "validate", target: "end" },
+  ],
+};
+```
+
+### Transaction with an event subprocess
+
+Use `subProcessType: "transaction"` for an atomic operation and `subProcessType: "event"` for a recovery handler:
+
+```typescript
+const transaction: INode = {
+  id: "Fulfill",
+  type: "subProcess",
+  name: "Fulfill order",
+  subProcess: {
+    subProcessType: "transaction",
+    expanded: true,
+    nodes: [
+      { id: "txStart", type: "start" },
+      { id: "reserve", type: "serviceTask", name: "Reserve stock" },
+      { id: "txEnd", type: "end" },
+    ],
+    edges: [
+      { source: "txStart", target: "reserve" },
+      { source: "reserve", target: "txEnd" },
+    ],
+  },
+};
+```
+
+### Compensation boundary event
+
+Attach a compensation event to the activity it reverses and reference the undo activity explicitly:
+
+```typescript
+{
+  id: "Compensate",
+  type: "boundaryEvent",
+  attachedTo: "ChargeCard",
+  eventDefinition: "compensation",
+  eventDefinitionOptions: {
+    activityRef: "UndoCharge",
+    waitForCompletion: false,
+  },
+}
+```
+
+### Multiple event and link handoff
+
+An event can wait for more than one trigger. Link events use the same `linkName` on the throw and catch sides:
+
+```typescript
+{
+  id: "WaitForAny",
+  type: "intermediateCatch",
+  eventDefinitions: ["timer", "message"],
+},
+// another node in the same nodes[] array
+{
+  id: "Jump",
+  type: "intermediateThrow",
+  eventDefinition: "link",
+  eventDefinitionOptions: {
+    linkName: "ReviewHandoff",
+    linkDirection: "source",
+  },
+}
+```
+
+### Fixture coverage
+
+| Fixture | Demonstrates |
+| --- | --- |
+| `accountsPayable` | two pools, lanes, messages, event-based gateway, data store |
+| `dataObjects` | document input/output associations |
+| `artifacts` | text annotation, group, association |
+| `advancedSubprocesses` | transaction and event subprocesses |
+| `controlEvents` | cancel, compensation, link, and multiple definitions |
+| `complexGatewayLoops` | complex gateway, loop cardinality, completion condition |
+| `compensation` | compensation `activityRef` and `waitForCompletion` |
+| `linkEvents` | link throw/catch pair |
+
+Run `npm run preview` to render every fixture to `.bpmn` and `.png`.
+
 ## API
 
 ### `convert(model): Promise<string>`
@@ -168,6 +281,10 @@ import type {
   ILane,
   IMessageFlow,
   IDataStore,
+  IDataObject,
+  ITextAnnotation,
+  IGroup,
+  IAssociation,
   DiColor,
   NodeType,
   EventDefinition,
@@ -203,6 +320,10 @@ type ProcessModel = {
   }[];
   messageFlows?: { id?: string; source: string; target: string; name?: string }[];
   dataStores?: { id: string; name?: string }[];
+  dataObjects?: { id: string; name?: string; isCollection?: boolean }[];
+  textAnnotations?: ITextAnnotation[];
+  groups?: IGroup[];
+  associations?: IAssociation[];
 };
 
 type INode = {
@@ -210,8 +331,20 @@ type INode = {
   type: NodeType;
   name?: string;
   laneId?: string;
-  eventDefinition?: "timer" | "message";
-  multiInstance?: boolean | { sequential?: boolean };
+  eventDefinition?: EventDefinition;
+  eventDefinitions?: EventDefinition[];
+  eventDefinitionOptions?: {
+    activityRef?: string;
+    waitForCompletion?: boolean;
+    linkName?: string;
+    linkDirection?: "source" | "target";
+  };
+  multiInstance?: boolean | {
+    sequential?: boolean;
+    loopCardinality?: string | number;
+    completionCondition?: string;
+    behavior?: "All" | "One" | "Complex";
+  };
   dataInputs?: string[];  // data store ids
   dataOutputs?: string[]; // data store ids
   /** bpmn.io bioc + OMG color on the DI shape */

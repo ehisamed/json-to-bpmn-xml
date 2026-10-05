@@ -16,6 +16,17 @@ import {
   gatewayMultiToSameEnd,
   gatewayYesNoCross,
   gatewayJoinBypassTop,
+  inclusiveGateway,
+  embeddedSubprocess,
+  extendedEvents,
+  activityTypes,
+  dataObjects,
+  artifacts,
+  advancedSubprocesses,
+  controlEvents,
+  complexGatewayLoops,
+  compensation,
+  linkEvents,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -39,6 +50,17 @@ const layoutFixtures = [
   { name: "gatewayMultiToSameEnd", model: gatewayMultiToSameEnd },
   { name: "gatewayYesNoCross", model: gatewayYesNoCross },
   { name: "gatewayJoinBypassTop", model: gatewayJoinBypassTop },
+  { name: "inclusiveGateway", model: inclusiveGateway },
+  { name: "embeddedSubprocess", model: embeddedSubprocess },
+  { name: "extendedEvents", model: extendedEvents },
+  { name: "activityTypes", model: activityTypes },
+  { name: "dataObjects", model: dataObjects },
+  { name: "artifacts", model: artifacts },
+  { name: "advancedSubprocesses", model: advancedSubprocesses },
+  { name: "controlEvents", model: controlEvents },
+  { name: "complexGatewayLoops", model: complexGatewayLoops },
+  { name: "compensation", model: compensation },
+  { name: "linkEvents", model: linkEvents },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -105,6 +127,16 @@ describe("layout case fixtures", () => {
     );
   });
 
+  it("inclusive gateways expose a visible marker in DI", async () => {
+    const xml = await convert(inclusiveGateway);
+    expect(xml).toContain("<bpmn:inclusiveGateway");
+    expect(xml).toMatch(
+      /bpmnElement="Split"[^>]*isMarkerVisible="true"/,
+    );
+    expect(xml).toContain("sendEmail = true");
+    expect(xml).toContain("sendSms = true");
+  });
+
   it("schedulePayments timer start has clock definition", async () => {
     const { schedulePayments } = await import("../fixtures/models");
     const xml = await convert(schedulePayments);
@@ -115,5 +147,108 @@ describe("layout case fixtures", () => {
     const xml = await convert(subprocessAndMultiInstance);
     expect(xml).toContain("<bpmn:subProcess");
     expect(xml).toContain("<bpmn:multiInstanceLoopCharacteristics");
+  });
+
+  it("serializes embedded subprocess flow elements", async () => {
+    const xml = await convert(embeddedSubprocess);
+    expect(xml).toContain('<bpmn:subProcess id="Verify"');
+    expect(xml).toContain('<bpmn:startEvent id="VerifyStart"');
+    expect(xml).toContain('<bpmn:serviceTask id="CheckIdentity"');
+    expect(xml).toContain('<bpmn:endEvent id="VerifyEnd"');
+    expect(xml).toContain('bpmnElement="Verify" isExpanded="true"');
+    expect(xml).toContain('bpmnElement="VerifyStart"');
+    expect(xml).toContain('bpmnElement="VerifyFlow_1"');
+  });
+
+  it("emits extended event definitions", async () => {
+    const xml = await convert(extendedEvents);
+    expect(xml).toContain("<bpmn:signalEventDefinition");
+    expect(xml).toContain("<bpmn:conditionalEventDefinition");
+    expect(xml).toContain("<bpmn:errorEventDefinition");
+    expect(xml).toContain("<bpmn:escalationEventDefinition");
+    expect(xml).toContain("<bpmn:terminateEventDefinition");
+  });
+
+  it("emits the supported specialized activity types", async () => {
+    const xml = await convert(activityTypes);
+    expect(xml).toContain("<bpmn:manualTask");
+    expect(xml).toContain('implementation="email"');
+    expect(xml).toContain("<bpmn:receiveTask");
+    expect(xml).toContain('<bpmn:scriptTask id="Script"');
+    expect(xml).toContain('scriptFormat="javascript"');
+    expect(xml).toContain("return order.weight * rate;");
+    expect(xml).toContain("<bpmn:businessRuleTask");
+    expect(xml).toContain('<bpmn:callActivity id="Call"');
+    expect(xml).toContain('calledElement="CreateShipmentProcess"');
+  });
+
+  it("emits data object references and input/output associations", async () => {
+    const xml = await convert(dataObjects);
+    expect(xml).toContain('<bpmn:dataObjectReference id="InvoiceDocument"');
+    expect(xml).toContain('name="Validated invoice"');
+    expect(xml).toContain('id="DataObjectOutput_Receive_InvoiceDocument"');
+    expect(xml).toContain('id="DataObjectInput_Validate_InvoiceDocument"');
+    expect(xml).toContain("<bpmn:targetRef>InvoiceDocument</bpmn:targetRef>");
+    expect(xml).toContain("<bpmn:sourceRef>InvoiceDocument</bpmn:sourceRef>");
+    expect(xml).toMatch(
+      /bpmnElement="InvoiceDocument"[\s\S]*?<dc:Bounds[^>]*width="50" height="50"/,
+    );
+  });
+
+  it("emits text annotations, groups, and associations", async () => {
+    const xml = await convert(artifacts);
+    expect(xml).toContain('<bpmn:textAnnotation id="Note_Compliance"');
+    expect(xml).toContain("Manual compliance review is required");
+    expect(xml).toContain('<bpmn:group id="Group_Review"');
+    expect(xml).toContain('<bpmn:association id="Association_Note"');
+    expect(xml).toContain('sourceRef="Approve"');
+    expect(xml).toContain('targetRef="Note_Compliance"');
+    expect(xml).toMatch(/bpmnElement="Note_Compliance"[\s\S]*?<dc:Bounds/);
+  });
+
+  it("emits event and transaction subprocesses", async () => {
+    const xml = await convert(advancedSubprocesses);
+    expect(xml).toContain('<bpmn:transaction id="FulfillTransaction"');
+    expect(xml).toContain('triggeredByEvent="true"');
+    expect(xml).toContain('<bpmn:subProcess id="RecoveryEvents"');
+    expect(xml).toContain('<bpmn:startEvent id="RecoveryStart"');
+    expect(xml).toContain('<bpmn:errorEventDefinition');
+    expect(xml).toContain('bpmnElement="FulfillTransaction" isExpanded="true"');
+    expect(xml).toContain('bpmnElement="RecoveryEvents" isExpanded="true"');
+  });
+
+  it("emits cancel, compensation, and link event definitions", async () => {
+    const xml = await convert(controlEvents);
+    expect(xml).toContain("<bpmn:cancelEventDefinition");
+    expect(xml).toContain("<bpmn:compensateEventDefinition");
+    expect(xml).toContain("<bpmn:linkEventDefinition");
+    expect(xml).toContain('<bpmn:intermediateCatchEvent id="MultipleWait"');
+    expect(xml).toContain('id="MultipleWait_timerDef_1"');
+    expect(xml).toContain('id="MultipleWait_messageDef_2"');
+  });
+
+  it("emits complex gateways and advanced loop characteristics", async () => {
+    const xml = await convert(complexGatewayLoops);
+    expect(xml).toContain('<bpmn:complexGateway id="Split"');
+    expect(xml).toContain('isMarkerVisible="true"');
+    expect(xml).toContain('<bpmn:multiInstanceLoopCharacteristics behavior="Complex"');
+    expect(xml).toContain("<bpmn:loopCardinality xsi:type=\"bpmn:tFormalExpression\">3</bpmn:loopCardinality>");
+    expect(xml).toContain("<bpmn:completionCondition xsi:type=\"bpmn:tFormalExpression\">approved &gt;= 2</bpmn:completionCondition>");
+  });
+
+  it("emits compensation activityRef and waitForCompletion", async () => {
+    const xml = await convert(compensation);
+    expect(xml).toContain('<bpmn:compensateEventDefinition id="Compensate_compensationDef" waitForCompletion="false"');
+    expect(xml).toContain('activityRef="UndoCharge"');
+    expect(xml).toContain('attachedToRef="ChargeCard"');
+  });
+
+  it("connects link event definitions by name", async () => {
+    const xml = await convert(linkEvents);
+    expect(xml).toContain('<bpmn:intermediateThrowEvent id="LinkThrow"');
+    expect(xml).toContain('<bpmn:intermediateCatchEvent id="LinkCatch"');
+    expect(xml).toContain('name="ReviewHandoff"');
+    expect(xml).toContain("<bpmn:target>LinkCatch_linkDef</bpmn:target>");
+    expect(xml).toContain("<bpmn:source>LinkThrow_linkDef</bpmn:source>");
   });
 });

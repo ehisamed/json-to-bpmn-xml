@@ -9,6 +9,8 @@ import type { BPMNModdle, FlowNode } from "bpmn-moddle";
 import format from "xml-formatter";
 import { normalizeModel } from "../utils/normalize-model";
 import type { DiColor } from "../types/di-color";
+import type { IEdge } from "../types/edge";
+import type { INode } from "../types/node";
 
 export class BpmnConverter {
   private moddle: BPMNModdle;
@@ -37,6 +39,8 @@ export class BpmnConverter {
     const participants: any[] = [];
 
     const dataStoreById = new Map<string, any>();
+    const dataObjectById = new Map<string, any>();
+    const artifactById = new Map<string, any>();
     const colorsById = new Map<string, DiColor>();
 
     for (const store of normalized.dataStores) {
@@ -49,6 +53,44 @@ export class BpmnConverter {
       if (store.color) colorsById.set(store.id, store.color);
     }
 
+    for (const object of normalized.dataObjects) {
+      const attrs: Record<string, unknown> = { id: object.id };
+      if (object.name !== undefined) attrs.name = object.name;
+      if (object.isCollection !== undefined) {
+        attrs.isCollection = object.isCollection;
+      }
+      dataObjectById.set(
+        object.id,
+        this.moddle.create("bpmn:DataObjectReference", attrs),
+      );
+      if (object.color) colorsById.set(object.id, object.color);
+    }
+    const dataReferenceById = new Map([
+      ...dataStoreById,
+      ...dataObjectById,
+    ]);
+
+    for (const annotation of normalized.textAnnotations) {
+      artifactById.set(
+        annotation.id,
+        this.moddle.create("bpmn:TextAnnotation", {
+          id: annotation.id,
+          text: annotation.text,
+        }),
+      );
+      if (annotation.color) colorsById.set(annotation.id, annotation.color);
+    }
+    for (const group of normalized.groups) {
+      artifactById.set(
+        group.id,
+        this.moddle.create("bpmn:Group", {
+          id: group.id,
+        }),
+      );
+      if (group.color) colorsById.set(group.id, group.color);
+    }
+    const allElementById = new Map<string, any>(artifactById);
+
     // Attach each data store to the first process that references it (or the first process).
     const storeOwner = new Map<string, string>();
     for (const processDef of normalized.processes) {
@@ -56,6 +98,8 @@ export class BpmnConverter {
         for (const id of [
           ...(node.dataInputs ?? []),
           ...(node.dataOutputs ?? []),
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
         ]) {
           if (!storeOwner.has(id)) storeOwner.set(id, processDef.id);
         }
@@ -63,18 +107,16 @@ export class BpmnConverter {
     }
 
     for (const processDef of normalized.processes) {
-      const elements = processDef.nodes.map((node) =>
-        this.nodeBuilder.build(node),
-      );
+      const built = this.buildFlowElements(processDef.nodes, processDef.edges);
+      const elements = built.elements;
       for (const node of processDef.nodes) {
         if (node.color) colorsById.set(node.id, node.color);
       }
-      const elementById = new Map(
-        elements.map((el) => [String(el.id), el] as [string, FlowNode]),
-      );
+      const elementById = built.elementById;
 
       for (const [id, el] of elementById) {
         globalElementById.set(id, el);
+        allElementById.set(id, el);
       }
 
       // Data associations
@@ -84,10 +126,10 @@ export class BpmnConverter {
 
         if (node.dataOutputs?.length) {
           el.dataOutputAssociations = node.dataOutputs.map((storeId) => {
-            const store = dataStoreById.get(storeId);
+            const store = dataReferenceById.get(storeId);
             if (!store) {
               throw new Error(
-                `Node "${node.id}" dataOutputs references unknown data store "${storeId}"`,
+                `Node "${node.id}" dataOutputs references unknown data reference "${storeId}"`,
               );
             }
             return this.moddle.create("bpmn:DataOutputAssociation", {
@@ -104,10 +146,10 @@ export class BpmnConverter {
           });
           el.properties = [...(el.properties ?? []), property];
           el.dataInputAssociations = node.dataInputs.map((storeId) => {
-            const store = dataStoreById.get(storeId);
+            const store = dataReferenceById.get(storeId);
             if (!store) {
               throw new Error(
-                `Node "${node.id}" dataInputs references unknown data store "${storeId}"`,
+                `Node "${node.id}" dataInputs references unknown data reference "${storeId}"`,
               );
             }
             return this.moddle.create("bpmn:DataInputAssociation", {
@@ -117,11 +159,51 @@ export class BpmnConverter {
             });
           });
         }
+
+        if (node.dataObjectOutputs?.length) {
+          el.dataOutputAssociations = [
+            ...(el.dataOutputAssociations ?? []),
+            ...node.dataObjectOutputs.map((objectId) => {
+              const object = dataObjectById.get(objectId);
+              if (!object) {
+                throw new Error(
+                  `Node "${node.id}" dataObjectOutputs references unknown data object "${objectId}"`,
+                );
+              }
+              return this.moddle.create("bpmn:DataOutputAssociation", {
+                id: `DataObjectOutput_${node.id}_${objectId}`,
+                targetRef: object,
+              });
+            }),
+          ];
+        }
+
+        if (node.dataObjectInputs?.length) {
+          const property = this.moddle.create("bpmn:Property", {
+            id: `DataObjectProperty_${node.id}_target`,
+            name: "__dataObject_targetRef_placeholder",
+          });
+          el.properties = [...(el.properties ?? []), property];
+          el.dataInputAssociations = [
+            ...(el.dataInputAssociations ?? []),
+            ...node.dataObjectInputs.map((objectId) => {
+              const object = dataObjectById.get(objectId);
+              if (!object) {
+                throw new Error(
+                  `Node "${node.id}" dataObjectInputs references unknown data object "${objectId}"`,
+                );
+              }
+              return this.moddle.create("bpmn:DataInputAssociation", {
+                id: `DataObjectInput_${node.id}_${objectId}`,
+                sourceRef: [object],
+                targetRef: property,
+              });
+            }),
+          ];
+        }
       }
 
-      const flows = processDef.edges.map((edge, index) =>
-        this.flowBuilder.build(edge, elementById, index),
-      );
+      const flows = built.flows;
       const flowMeta = processDef.edges.map((edge, index) =>
         this.flowBuilder.buildMeta(edge, flows[index], index),
       );
@@ -134,12 +216,19 @@ export class BpmnConverter {
       const ownedStores = [...dataStoreById.entries()]
         .filter(([storeId]) => (storeOwner.get(storeId) ?? normalized.processes[0]!.id) === processDef.id)
         .map(([, store]) => store);
+      const ownedObjects = [...dataObjectById.entries()]
+        .filter(([objectId]) => (storeOwner.get(objectId) ?? normalized.processes[0]!.id) === processDef.id)
+        .map(([, object]) => object);
+      const artifacts = processDef.id === normalized.processes[0]!.id
+        ? [...artifactById.values()]
+        : [];
 
       const process = this.processBuilder.build(
         processDef.id,
         processDef.name,
-        [...elements, ...ownedStores, ...flows],
+        [...elements, ...ownedStores, ...ownedObjects, ...flows],
         laneSets,
+        artifacts,
       );
       bpmnProcesses.push(process);
 
@@ -162,7 +251,8 @@ export class BpmnConverter {
         laneElements,
         sourceLanes: processDef.lanes ?? [],
         sourceNodes: processDef.nodes,
-        dataStoreElements: ownedStores,
+        dataStoreElements: [...ownedStores, ...ownedObjects],
+        artifactElements: artifacts,
       });
     }
 
@@ -207,15 +297,44 @@ export class BpmnConverter {
     const dataAssociationMetas = this.collectDataAssociationMetas(
       normalized,
       globalElementById,
-      dataStoreById,
+      dataReferenceById,
     );
+    const artifactAssociationMetas = normalized.associations.map((association) => {
+      const source = allElementById.get(association.source);
+      const target = allElementById.get(association.target);
+      if (!source || !target) {
+        throw new Error(
+          `Association "${association.id}" references unknown source or target`,
+        );
+      }
+      const bpmnAssociation = this.moddle.create("bpmn:Association", {
+        id: association.id,
+        sourceRef: source,
+        targetRef: target,
+        ...(association.associationDirection
+          ? { associationDirection: association.associationDirection }
+          : {}),
+      });
+      return {
+        id: association.id,
+        association: bpmnAssociation,
+        fromId: association.source,
+        toId: association.target,
+      };
+    });
+    if (artifactAssociationMetas.length && bpmnProcesses[0]) {
+      bpmnProcesses[0].artifacts = [
+        ...(bpmnProcesses[0].artifacts ?? []),
+        ...artifactAssociationMetas.map((meta) => meta.association),
+      ];
+    }
 
     definitions.diagrams = [
       await this.diagramBuilder.build({
         collaboration,
         processes: processDiagramInputs,
         messageFlows: messageFlowMetas,
-        dataAssociations: dataAssociationMetas,
+        dataAssociations: [...dataAssociationMetas, ...artifactAssociationMetas],
         colorsById,
       }),
     ];
@@ -227,7 +346,7 @@ export class BpmnConverter {
   private collectDataAssociationMetas(
     normalized: ReturnType<typeof normalizeModel>,
     elementById: Map<string, FlowNode>,
-    dataStoreById: Map<string, any>,
+    dataReferenceById: Map<string, any>,
   ) {
     const metas: Array<{
       id: string;
@@ -266,12 +385,102 @@ export class BpmnConverter {
 
     // Ensure stores exist
     for (const meta of metas) {
-      if (!dataStoreById.has(meta.fromId) && !elementById.has(meta.fromId)) {
+      if (!dataReferenceById.has(meta.fromId) && !elementById.has(meta.fromId)) {
         // from is store for input, node for output — already validated at build
       }
     }
 
     return metas;
+  }
+
+  private buildFlowElements(nodes: INode[], edges: IEdge[]) {
+    const elements = nodes.map((node) => this.nodeBuilder.build(node));
+    const elementById = new Map(
+      elements.map((el) => [String(el.id), el] as [string, FlowNode]),
+    );
+
+    for (const node of nodes) {
+      const activityRef = node.eventDefinitionOptions?.activityRef;
+      if (!activityRef) continue;
+      const source = elementById.get(node.id) as any;
+      const activity = elementById.get(activityRef);
+      if (!activity) {
+        throw new Error(
+          `Node "${node.id}" eventDefinition references unknown activity "${activityRef}"`,
+        );
+      }
+      for (const definition of source?.eventDefinitions ?? []) {
+        if (definition.$type === "bpmn:CompensateEventDefinition") {
+          definition.activityRef = activity;
+        }
+      }
+    }
+
+    const linkSources = new Map<string, any>();
+    const linkTargets = new Map<string, any>();
+    for (const node of nodes) {
+      const options = node.eventDefinitionOptions;
+      if (!options?.linkName) continue;
+      const element = elementById.get(node.id) as any;
+      for (const definition of element?.eventDefinitions ?? []) {
+        if (definition.$type !== "bpmn:LinkEventDefinition") continue;
+        const direction =
+          options.linkDirection ??
+          (node.type === "intermediateThrow" ? "source" : "target");
+        const map = direction === "source" ? linkSources : linkTargets;
+        if (map.has(options.linkName)) {
+          throw new Error(
+            `Duplicate ${direction} link event name "${options.linkName}"`,
+          );
+        }
+        map.set(options.linkName, definition);
+      }
+    }
+    for (const [name, source] of linkSources) {
+      const target = linkTargets.get(name);
+      if (!target) {
+        throw new Error(`Link event "${name}" has no target`);
+      }
+      source.target = target;
+      target.source = [source];
+    }
+    for (const name of linkTargets.keys()) {
+      if (!linkSources.has(name)) {
+        throw new Error(`Link event "${name}" has no source`);
+      }
+    }
+
+    for (const node of nodes) {
+      if (node.type === "boundaryEvent") {
+        const boundary = elementById.get(node.id) as any;
+        const attachedTo = node.attachedTo
+          ? elementById.get(node.attachedTo)
+          : undefined;
+        if (!attachedTo) {
+          throw new Error(
+            `Boundary event "${node.id}" references unknown attachedTo "${node.attachedTo ?? ""}"`,
+          );
+        }
+        boundary.attachedToRef = attachedTo;
+      }
+
+      if (node.type === "subProcess" && node.subProcess) {
+        const nested = this.buildFlowElements(
+          node.subProcess.nodes,
+          node.subProcess.edges,
+        );
+        (elementById.get(node.id) as any).flowElements = [
+          ...nested.elements,
+          ...nested.flows,
+        ];
+      }
+    }
+
+    const flows = edges.map((edge, index) =>
+      this.flowBuilder.build(edge, elementById, index),
+    );
+
+    return { elements, elementById, flows };
   }
 
   private validate(model: ReturnType<typeof normalizeModel>) {
@@ -285,9 +494,30 @@ export class BpmnConverter {
 
     const allNodeIds = new Set<string>();
     const dataStoreIds = new Set(model.dataStores.map((d) => d.id));
+    const dataObjectIds = new Set(model.dataObjects.map((d) => d.id));
+    const artifactIds = new Set([
+      ...model.textAnnotations.map((a) => a.id),
+      ...model.groups.map((g) => g.id),
+    ]);
 
     if (dataStoreIds.size !== model.dataStores.length) {
       throw new Error("ProcessModel.dataStores contains duplicate ids");
+    }
+    if (dataObjectIds.size !== model.dataObjects.length) {
+      throw new Error("ProcessModel.dataObjects contains duplicate ids");
+    }
+    for (const id of dataObjectIds) {
+      if (dataStoreIds.has(id)) {
+        throw new Error(`Duplicate data reference id: "${id}"`);
+      }
+    }
+    if (artifactIds.size !== model.textAnnotations.length + model.groups.length) {
+      throw new Error("ProcessModel artifacts contain duplicate ids");
+    }
+    for (const id of artifactIds) {
+      if (dataStoreIds.has(id) || dataObjectIds.has(id)) {
+        throw new Error(`Duplicate artifact/data reference id: "${id}"`);
+      }
     }
 
     for (const processDef of model.processes) {
@@ -323,6 +553,14 @@ export class BpmnConverter {
       }
 
       for (const node of processDef.nodes) {
+        if (node.subProcess && node.type !== "subProcess") {
+          throw new Error(
+            `Node "${node.id}" defines subProcess content but is not a subProcess`,
+          );
+        }
+        if (node.type === "boundaryEvent" && !node.attachedTo) {
+          throw new Error(`Boundary event "${node.id}" requires attachedTo`);
+        }
         if (node.laneId && !laneIds.has(node.laneId)) {
           throw new Error(
             `Node "${node.id}" references unknown laneId "${node.laneId}"`,
@@ -331,12 +569,42 @@ export class BpmnConverter {
         for (const storeId of [
           ...(node.dataInputs ?? []),
           ...(node.dataOutputs ?? []),
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
         ]) {
-          if (!dataStoreIds.has(storeId)) {
+          if (!dataStoreIds.has(storeId) && !dataObjectIds.has(storeId)) {
             throw new Error(
-              `Node "${node.id}" references unknown data store "${storeId}"`,
+              `Node "${node.id}" references unknown data reference "${storeId}"`,
             );
           }
+        }
+
+        for (const objectId of [
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
+        ]) {
+          if (!dataObjectIds.has(objectId)) {
+            throw new Error(
+              `Node "${node.id}" references unknown data object "${objectId}"`,
+            );
+          }
+        }
+
+        if (node.subProcess) {
+          if (!node.subProcess.nodes?.length) {
+            throw new Error(`SubProcess "${node.id}" must contain nodes`);
+          }
+          if (!Array.isArray(node.subProcess.edges)) {
+            throw new Error(`SubProcess "${node.id}" edges must be an array`);
+          }
+          this.validateNestedNodes(
+            node.subProcess.nodes,
+            node.subProcess.edges,
+            `SubProcess "${node.id}"`,
+            allNodeIds,
+            dataStoreIds,
+            dataObjectIds,
+          );
         }
       }
 
@@ -363,6 +631,89 @@ export class BpmnConverter {
       if (!allNodeIds.has(mf.target)) {
         throw new Error(
           `MessageFlow has unknown target "${mf.target}"`,
+        );
+      }
+    }
+
+    const knownIds = new Set([...allNodeIds, ...artifactIds]);
+    for (const association of model.associations) {
+      if (!knownIds.has(association.source) || !knownIds.has(association.target)) {
+        throw new Error(
+          `Association "${association.id}" references unknown source or target`,
+        );
+      }
+    }
+  }
+
+  private validateNestedNodes(
+    nodes: INode[],
+    edges: IEdge[],
+    scope: string,
+    allNodeIds: Set<string>,
+    dataStoreIds: Set<string>,
+    dataObjectIds: Set<string>,
+  ) {
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    if (nodeIds.size !== nodes.length) {
+      throw new Error(`${scope} contains duplicate node ids`);
+    }
+
+    for (const node of nodes) {
+      if (allNodeIds.has(node.id)) {
+        throw new Error(`Duplicate node id across processes: "${node.id}"`);
+      }
+      allNodeIds.add(node.id);
+      if (node.laneId) {
+        throw new Error(
+          `Nested node "${node.id}" cannot reference laneId "${node.laneId}"`,
+        );
+      }
+      if (node.type === "boundaryEvent" && !node.attachedTo) {
+        throw new Error(`Boundary event "${node.id}" requires attachedTo`);
+      }
+      for (const storeId of [
+        ...(node.dataInputs ?? []),
+        ...(node.dataOutputs ?? []),
+        ...(node.dataObjectInputs ?? []),
+        ...(node.dataObjectOutputs ?? []),
+      ]) {
+        if (!dataStoreIds.has(storeId) && !dataObjectIds.has(storeId)) {
+          throw new Error(
+            `Node "${node.id}" references unknown data reference "${storeId}"`,
+          );
+        }
+      }
+      for (const objectId of [
+        ...(node.dataObjectInputs ?? []),
+        ...(node.dataObjectOutputs ?? []),
+      ]) {
+        if (!dataObjectIds.has(objectId)) {
+          throw new Error(
+            `Node "${node.id}" references unknown data object "${objectId}"`,
+          );
+        }
+      }
+      if (node.subProcess) {
+        this.validateNestedNodes(
+          node.subProcess.nodes,
+          node.subProcess.edges,
+          `SubProcess "${node.id}"`,
+          allNodeIds,
+          dataStoreIds,
+          dataObjectIds,
+        );
+      }
+    }
+
+    for (const edge of edges) {
+      if (!nodeIds.has(edge.source)) {
+        throw new Error(
+          `${scope} edge "${edge.id ?? `${edge.source}->${edge.target}`}" has unknown source "${edge.source}"`,
+        );
+      }
+      if (!nodeIds.has(edge.target)) {
+        throw new Error(
+          `${scope} edge "${edge.id ?? `${edge.source}->${edge.target}`}" has unknown target "${edge.target}"`,
         );
       }
     }

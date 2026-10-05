@@ -6,6 +6,8 @@ export type EdgeRouteInput = {
   id: string;
   sourceId: string;
   targetId: string;
+  /** Activity owning a boundary-event source, if this is a boundary flow. */
+  sourceAttachedToId?: string;
 };
 
 const NODE_PAD = 12;
@@ -132,6 +134,27 @@ function dockPoint(b: Bounds, side: Side, ratio: number): Point {
     case "bottom":
       return { x: b.x + b.width * r, y: b.y + b.height };
   }
+}
+
+function routeBoundaryEdge(
+  source: Bounds,
+  target: Bounds,
+  attached: Bounds,
+): Point[] {
+  const sourceBottom = { x: source.x + source.width / 2, y: source.y + source.height };
+  const targetCenter = center(target);
+  const channelX = attached.x - CHANNEL_GAP;
+  const channelY = attached.y + attached.height + CHANNEL_GAP;
+  const targetSide: Side = targetCenter.x <= channelX ? "right" : "left";
+  const targetDock = dockPoint(target, targetSide, 0.5);
+
+  return dedupePoints([
+    sourceBottom,
+    { x: sourceBottom.x, y: channelY },
+    { x: channelX, y: channelY },
+    { x: channelX, y: targetDock.y },
+    targetDock,
+  ]);
 }
 
 /** Exclusive/parallel gateways are ~50×50 diamonds in DI (not 36×36 events). */
@@ -924,6 +947,7 @@ export function routeOrthogonalEdges(
     id: string;
     sourceId: string;
     targetId: string;
+    sourceAttachedToId?: string;
     fromSide: Side;
     toSide: Side;
   };
@@ -945,6 +969,7 @@ export function routeOrthogonalEdges(
       id: edge.id,
       sourceId: edge.sourceId,
       targetId: edge.targetId,
+      sourceAttachedToId: edge.sourceAttachedToId,
       fromSide,
       toSide,
     });
@@ -1015,6 +1040,20 @@ export function routeOrthogonalEdges(
   for (const edge of planned) {
     const source = boundsById.get(edge.sourceId)!;
     const target = boundsById.get(edge.targetId)!;
+
+    if (edge.sourceAttachedToId) {
+      const attached = boundsById.get(edge.sourceAttachedToId);
+      if (attached) {
+        result.set(
+          edge.id,
+          routeBoundaryEdge(source, target, attached).map((p) => ({
+            x: Math.round(p.x),
+            y: Math.round(p.y),
+          })),
+        );
+        continue;
+      }
+    }
     const from = dockPoint(
       source,
       edge.fromSide,

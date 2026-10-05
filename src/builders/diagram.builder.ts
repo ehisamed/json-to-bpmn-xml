@@ -34,12 +34,18 @@ function getBoundsForType(type: string): { width: number; height: number } {
   if (
     type === "bpmn:StartEvent" ||
     type === "bpmn:EndEvent" ||
-    type === "bpmn:IntermediateCatchEvent"
+    type === "bpmn:IntermediateCatchEvent" ||
+    type === "bpmn:BoundaryEvent"
   ) {
     return NODE_SIZE.event;
   }
   if (type.endsWith("Gateway")) return NODE_SIZE.gateway;
-  if (type === "bpmn:DataStoreReference") return NODE_SIZE.dataStore;
+  if (
+    type === "bpmn:DataStoreReference" ||
+    type === "bpmn:DataObjectReference"
+  ) {
+    return NODE_SIZE.dataStore;
+  }
   return NODE_SIZE.default;
 }
 
@@ -52,6 +58,7 @@ export type ProcessDiagramInput = {
   sourceLanes: ILane[];
   sourceNodes: INode[];
   dataStoreElements?: any[];
+  artifactElements?: any[];
 };
 
 export type MessageFlowMeta = {
@@ -92,7 +99,7 @@ export class DiagramBuilder {
     if (!collaboration && processes.length === 1) {
       const only = processes[0]!;
       if (!only.sourceLanes.length) {
-        return this.buildFlatProcess(only);
+        return this.buildFlatProcess(only, dataAssociations);
       }
     }
 
@@ -397,7 +404,10 @@ export class DiagramBuilder {
     ]);
   }
 
-  private async buildFlatProcess(input: ProcessDiagramInput) {
+  private async buildFlatProcess(
+    input: ProcessDiagramInput,
+    dataAssociations: Array<{ id: string; association: any; fromId: string; toId: string }>,
+  ) {
     const { positions, nodeShapes, edgeShapes } = await this.layoutNodesAndEdges(
       input.elements,
       input.flows,
@@ -408,14 +418,47 @@ export class DiagramBuilder {
       false,
     );
 
+    const storeShapes: any[] = [];
+    const storePositions = new Map<string, Bounds>();
+    for (const [index, store] of (input.dataStoreElements ?? []).entries()) {
+      const bounds = {
+        x: 80 + index * 120,
+        y: 150,
+        width: NODE_SIZE.dataStore.width,
+        height: NODE_SIZE.dataStore.height,
+      };
+      storePositions.set(String(store.id), bounds);
+      storeShapes.push(this.createShape(String(store.id), store, bounds));
+    }
+    const allPositions = new Map(positions);
+    for (const [id, bounds] of storePositions) allPositions.set(id, bounds);
+    const artifactShapes: any[] = [];
+    for (const [index, artifact] of (input.artifactElements ?? []).entries()) {
+      const bounds = {
+        x: 80 + index * 150,
+        y: artifact.$type === "bpmn:Group" ? 330 : 250,
+        width: artifact.$type === "bpmn:TextAnnotation" ? Math.max(120, String(artifact.text ?? "").length * 7) : 110,
+        height: 55,
+      };
+      allPositions.set(String(artifact.id), bounds);
+      artifactShapes.push(this.createShape(String(artifact.id), artifact, bounds));
+    }
+    const associationShapes = dataAssociations
+      .map((association, index) => this.createBridgeEdge(
+        association.id,
+        association.association,
+        association.fromId,
+        association.toId,
+        allPositions,
+        { kind: "data", slotIndex: index, slotCount: dataAssociations.length, obstacles: [], gapTop: 0, gapBottom: 0 },
+      ))
+      .filter(Boolean);
+
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
       bpmnElement: input.process,
-      planeElement: [...nodeShapes, ...edgeShapes],
+      planeElement: [...nodeShapes, ...edgeShapes, ...storeShapes, ...artifactShapes, ...associationShapes],
     });
-
-    // silence unused
-    void positions;
 
     return this.moddle.create("bpmndi:BPMNDiagram", {
       id: "BPMNDiagram_1",
@@ -542,7 +585,11 @@ export class DiagramBuilder {
     useLanes: boolean,
   ) {
     const nodes = elements.map((el) => {
-      const size = getBoundsForType(el.$type);
+      const sourceNode = sourceNodes.find((node) => node.id === el.id);
+      const size =
+        sourceNode?.type === "subProcess" && sourceNode.subProcess?.expanded
+          ? { width: 440, height: 220 }
+          : getBoundsForType(el.$type);
       return { id: String(el.id), width: size.width, height: size.height };
     });
 
@@ -650,7 +697,7 @@ export class DiagramBuilder {
         laneHeights,
         laneOffsets,
       );
-
+      this.placeBoundaryEvents(positions, sourceNodes);
       // Recompute lane heights from final node extents.
       const maxBottomByLane = new Map<string, number>();
       for (const [id, bounds] of positions) {
@@ -688,10 +735,19 @@ export class DiagramBuilder {
         contentWidth = Math.max(contentWidth, b.x + b.width - POOL_OFFSET_X);
       }
 
+      const expanded = await this.createExpandedSubProcessDi(
+        elements,
+        sourceNodes,
+        positions,
+      );
+
       return {
         positions,
-        nodeShapes: this.createNodeShapes(elements, positions),
-        edgeShapes: this.createEdgeShapes(flows, positions),
+        nodeShapes: [
+          ...this.createNodeShapes(elements, positions, sourceNodes),
+          ...expanded.shapes,
+        ],
+        edgeShapes: [...this.createEdgeShapes(flows, positions), ...expanded.edges],
         contentWidth,
         contentHeight,
         laneHeights,
@@ -715,6 +771,7 @@ export class DiagramBuilder {
     this.alignGatewayBypassTasks(positions, flows, sourceNodes);
     this.ensureAdjacentEndGaps(positions, flows, sourceNodes);
     this.resolveOverlaps(positions);
+    this.placeBoundaryEvents(positions, sourceNodes);
 
     let contentWidth = 400;
     let contentHeight = DEFAULT_POOL_HEIGHT;
@@ -726,14 +783,41 @@ export class DiagramBuilder {
       );
     }
 
+    const expanded = await this.createExpandedSubProcessDi(
+      elements,
+      sourceNodes,
+      positions,
+    );
+
     return {
       positions,
-      nodeShapes: this.createNodeShapes(elements, positions),
-      edgeShapes: this.createEdgeShapes(flows, positions),
+      nodeShapes: [
+        ...this.createNodeShapes(elements, positions, sourceNodes),
+        ...expanded.shapes,
+      ],
+      edgeShapes: [...this.createEdgeShapes(flows, positions), ...expanded.edges],
       contentWidth,
       contentHeight,
       laneHeights: [],
     };
+  }
+
+  private placeBoundaryEvents(
+    positions: Map<string, Bounds>,
+    sourceNodes: INode[],
+  ) {
+    for (const node of sourceNodes) {
+      if (node.type !== "boundaryEvent" || !node.attachedTo) continue;
+      const event = positions.get(node.id);
+      const activity = positions.get(node.attachedTo);
+      if (!event || !activity) continue;
+
+      positions.set(node.id, {
+        ...event,
+        x: Math.round(activity.x + activity.width / 2 - event.width / 2),
+        y: Math.round(activity.y + activity.height - event.height / 2),
+      });
+    }
   }
 
   /**
@@ -1373,7 +1457,11 @@ export class DiagramBuilder {
     id: string,
     bpmnElement: any,
     bounds: Bounds,
-    extra?: { isHorizontal?: boolean; isMarkerVisible?: boolean },
+    extra?: {
+      isHorizontal?: boolean;
+      isMarkerVisible?: boolean;
+      isExpanded?: boolean;
+    },
   ) {
     const shape = this.moddle.create("bpmndi:BPMNShape", {
       id: `${id}_di`,
@@ -1383,6 +1471,9 @@ export class DiagramBuilder {
         : {}),
       ...(extra?.isMarkerVisible !== undefined
         ? { isMarkerVisible: extra.isMarkerVisible }
+        : {}),
+      ...(extra?.isExpanded !== undefined
+        ? { isExpanded: extra.isExpanded }
         : {}),
       bounds: this.moddle.create("dc:Bounds", {
         x: Math.round(bounds.x),
@@ -1395,15 +1486,25 @@ export class DiagramBuilder {
     return shape;
   }
 
-  private createNodeShapes(elements: any[], positions: Map<string, Bounds>) {
+  private createNodeShapes(
+    elements: any[],
+    positions: Map<string, Bounds>,
+    sourceNodes: INode[] = [],
+  ) {
     return elements
       .map((el) => {
         const b = positions.get(String(el.id));
         if (!b) return null;
+        const sourceNode = sourceNodes.find((node) => node.id === el.id);
         const extra =
-          el.$type === "bpmn:ExclusiveGateway"
+          el.$type === "bpmn:ExclusiveGateway" ||
+          el.$type === "bpmn:InclusiveGateway" ||
+          el.$type === "bpmn:ComplexGateway"
             ? { isMarkerVisible: true }
-            : undefined;
+            : sourceNode?.type === "subProcess" &&
+                sourceNode.subProcess?.expanded
+              ? { isExpanded: true }
+              : undefined;
         const shape = this.createShape(String(el.id), el, b, extra);
         const name = typeof el.name === "string" ? el.name : "";
         const isGateway = String(el.$type ?? "").includes("Gateway");
@@ -1443,12 +1544,93 @@ export class DiagramBuilder {
       .filter(Boolean);
   }
 
+  private async createExpandedSubProcessDi(
+    elements: any[],
+    sourceNodes: INode[],
+    positions: Map<string, Bounds>,
+  ) {
+    const shapes: any[] = [];
+    const edges: any[] = [];
+
+    for (const sourceNode of sourceNodes) {
+      if (sourceNode.type !== "subProcess" || !sourceNode.subProcess?.expanded) {
+        continue;
+      }
+      const subprocess = elements.find((element) => element.id === sourceNode.id);
+      const parentBounds = positions.get(sourceNode.id);
+      if (!subprocess || !parentBounds) continue;
+
+      const childElements = (subprocess.flowElements ?? []).filter(
+        (element: any) => element.$type !== "bpmn:SequenceFlow",
+      );
+      const childFlows = (subprocess.flowElements ?? []).filter(
+        (element: any) => element.$type === "bpmn:SequenceFlow",
+      );
+      if (!childElements.length) continue;
+
+      const childNodes = sourceNode.subProcess.nodes;
+      const childLayout = await layoutGraph(
+        childElements.map((element: any) => {
+          const size = getBoundsForType(element.$type);
+          return { id: String(element.id), width: size.width, height: size.height };
+        }),
+        sourceNode.subProcess.edges.map((edge) => ({
+          id: String(edge.id),
+          source: edge.source,
+          target: edge.target,
+        })),
+      );
+      const childLayoutById = new Map(
+        (childLayout.children ?? []).map((child: any) => [String(child.id), child]),
+      );
+      const minX = Math.min(
+        ...childElements.map((element: any) => Number(childLayoutById.get(String(element.id))?.x ?? 0)),
+      );
+      const minY = Math.min(
+        ...childElements.map((element: any) => Number(childLayoutById.get(String(element.id))?.y ?? 0)),
+      );
+      const innerX = parentBounds.x + 24;
+      const innerY = parentBounds.y + 42;
+      const childPositions = new Map<string, Bounds>();
+
+      for (const child of childElements) {
+        const layout = childLayoutById.get(String(child.id));
+        if (!layout) continue;
+        const size = getBoundsForType(child.$type);
+        childPositions.set(String(child.id), {
+          x: innerX + Number(layout.x ?? 0) - minX,
+          y: innerY + Number(layout.y ?? 0) - minY,
+          width: Number(layout.width ?? size.width),
+          height: Number(layout.height ?? size.height),
+        });
+      }
+
+      const childFlowMetas: FlowMeta[] = sourceNode.subProcess.edges.map(
+        (edge, index) => ({
+          id: String(edge.id ?? `Flow_${index + 1}`),
+          source: edge.source,
+          target: edge.target,
+          flow: childFlows.find(
+            (flow: any) => String(flow.id) === String(edge.id ?? `Flow_${index + 1}`),
+          ),
+        }),
+      );
+      shapes.push(...this.createNodeShapes(childElements, childPositions, childNodes));
+      edges.push(...this.createEdgeShapes(childFlowMetas, childPositions));
+    }
+
+    return { shapes, edges };
+  }
+
   private createEdgeShapes(flows: FlowMeta[], positions: Map<string, Bounds>) {
     const waypoints = routeOrthogonalEdges(
       flows.map((f) => ({
         id: f.id,
         sourceId: f.source,
         targetId: f.target,
+        sourceAttachedToId: f.flow.sourceRef?.attachedToRef?.id
+          ? String(f.flow.sourceRef.attachedToRef.id)
+          : undefined,
       })),
       positions,
     );
