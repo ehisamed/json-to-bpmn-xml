@@ -70,14 +70,25 @@ export class NodeBuilder {
     }
 
     if (node.multiInstance !== undefined && node.multiInstance !== false) {
-      const sequential =
-        typeof node.multiInstance === "object"
-          ? Boolean(node.multiInstance.sequential)
-          : false;
+      const options = typeof node.multiInstance === "object" ? node.multiInstance : {};
+      const sequential = Boolean(options.sequential);
 
       const loopAttrs: Record<string, unknown> = {};
       if (sequential) {
         loopAttrs.isSequential = true;
+      }
+      if (options.behavior !== undefined) {
+        loopAttrs.behavior = options.behavior;
+      }
+      if (options.loopCardinality !== undefined) {
+        loopAttrs.loopCardinality = this.moddle.create("bpmn:FormalExpression", {
+          body: String(options.loopCardinality),
+        });
+      }
+      if (options.completionCondition !== undefined) {
+        loopAttrs.completionCondition = this.moddle.create("bpmn:FormalExpression", {
+          body: options.completionCondition,
+        });
       }
 
       attrs.loopCharacteristics = this.moddle.create(

@@ -1498,7 +1498,8 @@ export class DiagramBuilder {
         const sourceNode = sourceNodes.find((node) => node.id === el.id);
         const extra =
           el.$type === "bpmn:ExclusiveGateway" ||
-          el.$type === "bpmn:InclusiveGateway"
+          el.$type === "bpmn:InclusiveGateway" ||
+          el.$type === "bpmn:ComplexGateway"
             ? { isMarkerVisible: true }
             : sourceNode?.type === "subProcess" &&
                 sourceNode.subProcess?.expanded

@@ -16,6 +16,7 @@ export const NODE_MAP: Record<NodeType, string> = {
   exclusiveGateway: "bpmn:ExclusiveGateway",
   inclusiveGateway: "bpmn:InclusiveGateway",
   parallelGateway: "bpmn:ParallelGateway",
+  complexGateway: "bpmn:ComplexGateway",
   eventBasedGateway: "bpmn:EventBasedGateway",
   intermediateCatch: "bpmn:IntermediateCatchEvent",
   boundaryEvent: "bpmn:BoundaryEvent",

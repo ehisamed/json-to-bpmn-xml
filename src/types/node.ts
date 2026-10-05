@@ -17,6 +17,7 @@ export type NodeType =
   | "exclusiveGateway"
   | "inclusiveGateway"
   | "parallelGateway"
+  | "complexGateway"
   | "eventBasedGateway"
   | "intermediateCatch"
   | "boundaryEvent";
@@ -77,7 +78,12 @@ export interface INode {
    * Multi-instance loop characteristics.
    * `true` → parallel MI; `{ sequential: true }` → sequential MI.
    */
-  multiInstance?: boolean | { sequential?: boolean };
+  multiInstance?: boolean | {
+    sequential?: boolean;
+    loopCardinality?: string | number;
+    completionCondition?: string;
+    behavior?: "All" | "One" | "Complex";
+  };
 
   /** Data store ids this node writes to (dataOutputAssociation). */
   dataOutputs?: string[];

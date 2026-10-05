@@ -24,6 +24,7 @@ import {
   artifacts,
   advancedSubprocesses,
   controlEvents,
+  complexGatewayLoops,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -55,6 +56,7 @@ const layoutFixtures = [
   { name: "artifacts", model: artifacts },
   { name: "advancedSubprocesses", model: advancedSubprocesses },
   { name: "controlEvents", model: controlEvents },
+  { name: "complexGatewayLoops", model: complexGatewayLoops },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -219,5 +221,14 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:intermediateCatchEvent id="MultipleWait"');
     expect(xml).toContain('id="MultipleWait_timerDef_1"');
     expect(xml).toContain('id="MultipleWait_messageDef_2"');
+  });
+
+  it("emits complex gateways and advanced loop characteristics", async () => {
+    const xml = await convert(complexGatewayLoops);
+    expect(xml).toContain('<bpmn:complexGateway id="Split"');
+    expect(xml).toContain('isMarkerVisible="true"');
+    expect(xml).toContain('<bpmn:multiInstanceLoopCharacteristics behavior="Complex"');
+    expect(xml).toContain("<bpmn:loopCardinality xsi:type=\"bpmn:tFormalExpression\">3</bpmn:loopCardinality>");
+    expect(xml).toContain("<bpmn:completionCondition xsi:type=\"bpmn:tFormalExpression\">approved &gt;= 2</bpmn:completionCondition>");
   });
 });
