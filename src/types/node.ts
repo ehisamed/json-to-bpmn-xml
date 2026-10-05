@@ -29,7 +29,10 @@ export type EventDefinition =
   | "conditional"
   | "error"
   | "escalation"
-  | "terminate";
+  | "terminate"
+  | "cancel"
+  | "compensation"
+  | "link";
 
 export interface ISubProcessDef {
   nodes: INode[];

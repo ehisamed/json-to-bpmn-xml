@@ -31,3 +31,4 @@ export { activityTypes } from "./activity-types";
 export { dataObjects } from "./data-objects";
 export { artifacts } from "./artifacts";
 export { advancedSubprocesses } from "./advanced-subprocesses";
+export { controlEvents } from "./control-events";

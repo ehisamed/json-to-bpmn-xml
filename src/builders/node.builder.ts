@@ -53,6 +53,9 @@ export class NodeBuilder {
         error: "bpmn:ErrorEventDefinition",
         escalation: "bpmn:EscalationEventDefinition",
         terminate: "bpmn:TerminateEventDefinition",
+        cancel: "bpmn:CancelEventDefinition",
+        compensation: "bpmn:CompensateEventDefinition",
+        link: "bpmn:LinkEventDefinition",
       } as const;
       const defType = defTypeByEvent[node.eventDefinition];
 

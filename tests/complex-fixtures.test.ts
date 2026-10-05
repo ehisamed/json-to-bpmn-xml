@@ -23,6 +23,7 @@ import {
   dataObjects,
   artifacts,
   advancedSubprocesses,
+  controlEvents,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -53,6 +54,7 @@ const layoutFixtures = [
   { name: "dataObjects", model: dataObjects },
   { name: "artifacts", model: artifacts },
   { name: "advancedSubprocesses", model: advancedSubprocesses },
+  { name: "controlEvents", model: controlEvents },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -207,5 +209,12 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:errorEventDefinition');
     expect(xml).toContain('bpmnElement="FulfillTransaction" isExpanded="true"');
     expect(xml).toContain('bpmnElement="RecoveryEvents" isExpanded="true"');
+  });
+
+  it("emits cancel, compensation, and link event definitions", async () => {
+    const xml = await convert(controlEvents);
+    expect(xml).toContain("<bpmn:cancelEventDefinition");
+    expect(xml).toContain("<bpmn:compensateEventDefinition");
+    expect(xml).toContain("<bpmn:linkEventDefinition");
   });
 });
