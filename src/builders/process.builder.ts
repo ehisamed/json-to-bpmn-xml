@@ -8,6 +8,7 @@ export class ProcessBuilder {
     name: string | undefined,
     flowElements: any[],
     laneSets?: any[],
+    artifacts?: any[],
   ) {
     const attrs: Record<string, unknown> = {
       id,
@@ -21,6 +22,9 @@ export class ProcessBuilder {
 
     if (laneSets?.length) {
       attrs.laneSets = laneSets;
+    }
+    if (artifacts?.length) {
+      attrs.artifacts = artifacts;
     }
 
     return this.moddle.create("bpmn:Process", attrs);

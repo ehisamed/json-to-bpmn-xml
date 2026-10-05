@@ -29,3 +29,4 @@ export { embeddedSubprocess } from "./embedded-subprocess";
 export { extendedEvents } from "./extended-events";
 export { activityTypes } from "./activity-types";
 export { dataObjects } from "./data-objects";
+export { artifacts } from "./artifacts";

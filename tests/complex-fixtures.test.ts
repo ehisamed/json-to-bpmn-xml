@@ -21,6 +21,7 @@ import {
   extendedEvents,
   activityTypes,
   dataObjects,
+  artifacts,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -49,6 +50,7 @@ const layoutFixtures = [
   { name: "extendedEvents", model: extendedEvents },
   { name: "activityTypes", model: activityTypes },
   { name: "dataObjects", model: dataObjects },
+  { name: "artifacts", model: artifacts },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -181,5 +183,16 @@ describe("layout case fixtures", () => {
     expect(xml).toMatch(
       /bpmnElement="InvoiceDocument"[\s\S]*?<dc:Bounds[^>]*width="50" height="50"/,
     );
+  });
+
+  it("emits text annotations, groups, and associations", async () => {
+    const xml = await convert(artifacts);
+    expect(xml).toContain('<bpmn:textAnnotation id="Note_Compliance"');
+    expect(xml).toContain("Manual compliance review is required");
+    expect(xml).toContain('<bpmn:group id="Group_Review"');
+    expect(xml).toContain('<bpmn:association id="Association_Note"');
+    expect(xml).toContain('sourceRef="Approve"');
+    expect(xml).toContain('targetRef="Note_Compliance"');
+    expect(xml).toMatch(/bpmnElement="Note_Compliance"[\s\S]*?<dc:Bounds/);
   });
 });

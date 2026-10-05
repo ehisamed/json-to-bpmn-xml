@@ -58,6 +58,7 @@ export type ProcessDiagramInput = {
   sourceLanes: ILane[];
   sourceNodes: INode[];
   dataStoreElements?: any[];
+  artifactElements?: any[];
 };
 
 export type MessageFlowMeta = {
@@ -431,6 +432,17 @@ export class DiagramBuilder {
     }
     const allPositions = new Map(positions);
     for (const [id, bounds] of storePositions) allPositions.set(id, bounds);
+    const artifactShapes: any[] = [];
+    for (const [index, artifact] of (input.artifactElements ?? []).entries()) {
+      const bounds = {
+        x: 80 + index * 150,
+        y: artifact.$type === "bpmn:Group" ? 330 : 250,
+        width: artifact.$type === "bpmn:TextAnnotation" ? Math.max(120, String(artifact.text ?? "").length * 7) : 110,
+        height: 55,
+      };
+      allPositions.set(String(artifact.id), bounds);
+      artifactShapes.push(this.createShape(String(artifact.id), artifact, bounds));
+    }
     const associationShapes = dataAssociations
       .map((association, index) => this.createBridgeEdge(
         association.id,
@@ -445,7 +457,7 @@ export class DiagramBuilder {
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
       bpmnElement: input.process,
-      planeElement: [...nodeShapes, ...edgeShapes, ...storeShapes, ...associationShapes],
+      planeElement: [...nodeShapes, ...edgeShapes, ...storeShapes, ...artifactShapes, ...associationShapes],
     });
 
     return this.moddle.create("bpmndi:BPMNDiagram", {

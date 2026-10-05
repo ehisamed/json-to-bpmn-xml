@@ -2,6 +2,7 @@ import type { ProcessModel, IProcessDef } from "../types/process";
 import type { IMessageFlow } from "../types/message-flow";
 import type { IDataStore } from "../types/data-store";
 import type { IDataObject } from "../types/data-object";
+import type { ITextAnnotation, IGroup, IAssociation } from "../types/artifact";
 
 export type NormalizedModel = {
   id: string;
@@ -10,6 +11,9 @@ export type NormalizedModel = {
   messageFlows: IMessageFlow[];
   dataStores: IDataStore[];
   dataObjects: IDataObject[];
+  textAnnotations: ITextAnnotation[];
+  groups: IGroup[];
+  associations: IAssociation[];
 };
 
 /**
@@ -24,6 +28,9 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
       messageFlows: model.messageFlows ?? [],
       dataStores: model.dataStores ?? [],
       dataObjects: model.dataObjects ?? [],
+      textAnnotations: model.textAnnotations ?? [],
+      groups: model.groups ?? [],
+      associations: model.associations ?? [],
     };
   }
 
@@ -49,5 +56,8 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
     messageFlows: model.messageFlows ?? [],
     dataStores: model.dataStores ?? [],
     dataObjects: model.dataObjects ?? [],
+    textAnnotations: model.textAnnotations ?? [],
+    groups: model.groups ?? [],
+    associations: model.associations ?? [],
   };
 }
