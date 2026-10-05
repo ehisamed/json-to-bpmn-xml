@@ -20,6 +20,7 @@ import {
   embeddedSubprocess,
   extendedEvents,
   activityTypes,
+  dataObjects,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -47,6 +48,7 @@ const layoutFixtures = [
   { name: "embeddedSubprocess", model: embeddedSubprocess },
   { name: "extendedEvents", model: extendedEvents },
   { name: "activityTypes", model: activityTypes },
+  { name: "dataObjects", model: dataObjects },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -166,5 +168,18 @@ describe("layout case fixtures", () => {
     expect(xml).toContain("<bpmn:businessRuleTask");
     expect(xml).toContain('<bpmn:callActivity id="Call"');
     expect(xml).toContain('calledElement="CreateShipmentProcess"');
+  });
+
+  it("emits data object references and input/output associations", async () => {
+    const xml = await convert(dataObjects);
+    expect(xml).toContain('<bpmn:dataObjectReference id="InvoiceDocument"');
+    expect(xml).toContain('name="Validated invoice"');
+    expect(xml).toContain('id="DataObjectOutput_Receive_InvoiceDocument"');
+    expect(xml).toContain('id="DataObjectInput_Validate_InvoiceDocument"');
+    expect(xml).toContain("<bpmn:targetRef>InvoiceDocument</bpmn:targetRef>");
+    expect(xml).toContain("<bpmn:sourceRef>InvoiceDocument</bpmn:sourceRef>");
+    expect(xml).toMatch(
+      /bpmnElement="InvoiceDocument"[\s\S]*?<dc:Bounds[^>]*width="50" height="50"/,
+    );
   });
 });

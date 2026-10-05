@@ -39,6 +39,7 @@ export class BpmnConverter {
     const participants: any[] = [];
 
     const dataStoreById = new Map<string, any>();
+    const dataObjectById = new Map<string, any>();
     const colorsById = new Map<string, DiColor>();
 
     for (const store of normalized.dataStores) {
@@ -51,6 +52,23 @@ export class BpmnConverter {
       if (store.color) colorsById.set(store.id, store.color);
     }
 
+    for (const object of normalized.dataObjects) {
+      const attrs: Record<string, unknown> = { id: object.id };
+      if (object.name !== undefined) attrs.name = object.name;
+      if (object.isCollection !== undefined) {
+        attrs.isCollection = object.isCollection;
+      }
+      dataObjectById.set(
+        object.id,
+        this.moddle.create("bpmn:DataObjectReference", attrs),
+      );
+      if (object.color) colorsById.set(object.id, object.color);
+    }
+    const dataReferenceById = new Map([
+      ...dataStoreById,
+      ...dataObjectById,
+    ]);
+
     // Attach each data store to the first process that references it (or the first process).
     const storeOwner = new Map<string, string>();
     for (const processDef of normalized.processes) {
@@ -58,6 +76,8 @@ export class BpmnConverter {
         for (const id of [
           ...(node.dataInputs ?? []),
           ...(node.dataOutputs ?? []),
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
         ]) {
           if (!storeOwner.has(id)) storeOwner.set(id, processDef.id);
         }
@@ -83,10 +103,10 @@ export class BpmnConverter {
 
         if (node.dataOutputs?.length) {
           el.dataOutputAssociations = node.dataOutputs.map((storeId) => {
-            const store = dataStoreById.get(storeId);
+            const store = dataReferenceById.get(storeId);
             if (!store) {
               throw new Error(
-                `Node "${node.id}" dataOutputs references unknown data store "${storeId}"`,
+                `Node "${node.id}" dataOutputs references unknown data reference "${storeId}"`,
               );
             }
             return this.moddle.create("bpmn:DataOutputAssociation", {
@@ -103,10 +123,10 @@ export class BpmnConverter {
           });
           el.properties = [...(el.properties ?? []), property];
           el.dataInputAssociations = node.dataInputs.map((storeId) => {
-            const store = dataStoreById.get(storeId);
+            const store = dataReferenceById.get(storeId);
             if (!store) {
               throw new Error(
-                `Node "${node.id}" dataInputs references unknown data store "${storeId}"`,
+                `Node "${node.id}" dataInputs references unknown data reference "${storeId}"`,
               );
             }
             return this.moddle.create("bpmn:DataInputAssociation", {
@@ -115,6 +135,48 @@ export class BpmnConverter {
               targetRef: property,
             });
           });
+        }
+
+        if (node.dataObjectOutputs?.length) {
+          el.dataOutputAssociations = [
+            ...(el.dataOutputAssociations ?? []),
+            ...node.dataObjectOutputs.map((objectId) => {
+              const object = dataObjectById.get(objectId);
+              if (!object) {
+                throw new Error(
+                  `Node "${node.id}" dataObjectOutputs references unknown data object "${objectId}"`,
+                );
+              }
+              return this.moddle.create("bpmn:DataOutputAssociation", {
+                id: `DataObjectOutput_${node.id}_${objectId}`,
+                targetRef: object,
+              });
+            }),
+          ];
+        }
+
+        if (node.dataObjectInputs?.length) {
+          const property = this.moddle.create("bpmn:Property", {
+            id: `DataObjectProperty_${node.id}_target`,
+            name: "__dataObject_targetRef_placeholder",
+          });
+          el.properties = [...(el.properties ?? []), property];
+          el.dataInputAssociations = [
+            ...(el.dataInputAssociations ?? []),
+            ...node.dataObjectInputs.map((objectId) => {
+              const object = dataObjectById.get(objectId);
+              if (!object) {
+                throw new Error(
+                  `Node "${node.id}" dataObjectInputs references unknown data object "${objectId}"`,
+                );
+              }
+              return this.moddle.create("bpmn:DataInputAssociation", {
+                id: `DataObjectInput_${node.id}_${objectId}`,
+                sourceRef: [object],
+                targetRef: property,
+              });
+            }),
+          ];
         }
       }
 
@@ -131,11 +193,14 @@ export class BpmnConverter {
       const ownedStores = [...dataStoreById.entries()]
         .filter(([storeId]) => (storeOwner.get(storeId) ?? normalized.processes[0]!.id) === processDef.id)
         .map(([, store]) => store);
+      const ownedObjects = [...dataObjectById.entries()]
+        .filter(([objectId]) => (storeOwner.get(objectId) ?? normalized.processes[0]!.id) === processDef.id)
+        .map(([, object]) => object);
 
       const process = this.processBuilder.build(
         processDef.id,
         processDef.name,
-        [...elements, ...ownedStores, ...flows],
+        [...elements, ...ownedStores, ...ownedObjects, ...flows],
         laneSets,
       );
       bpmnProcesses.push(process);
@@ -159,7 +224,7 @@ export class BpmnConverter {
         laneElements,
         sourceLanes: processDef.lanes ?? [],
         sourceNodes: processDef.nodes,
-        dataStoreElements: ownedStores,
+        dataStoreElements: [...ownedStores, ...ownedObjects],
       });
     }
 
@@ -204,7 +269,7 @@ export class BpmnConverter {
     const dataAssociationMetas = this.collectDataAssociationMetas(
       normalized,
       globalElementById,
-      dataStoreById,
+      dataReferenceById,
     );
 
     definitions.diagrams = [
@@ -224,7 +289,7 @@ export class BpmnConverter {
   private collectDataAssociationMetas(
     normalized: ReturnType<typeof normalizeModel>,
     elementById: Map<string, FlowNode>,
-    dataStoreById: Map<string, any>,
+    dataReferenceById: Map<string, any>,
   ) {
     const metas: Array<{
       id: string;
@@ -263,7 +328,7 @@ export class BpmnConverter {
 
     // Ensure stores exist
     for (const meta of metas) {
-      if (!dataStoreById.has(meta.fromId) && !elementById.has(meta.fromId)) {
+      if (!dataReferenceById.has(meta.fromId) && !elementById.has(meta.fromId)) {
         // from is store for input, node for output — already validated at build
       }
     }
@@ -321,9 +386,18 @@ export class BpmnConverter {
 
     const allNodeIds = new Set<string>();
     const dataStoreIds = new Set(model.dataStores.map((d) => d.id));
+    const dataObjectIds = new Set(model.dataObjects.map((d) => d.id));
 
     if (dataStoreIds.size !== model.dataStores.length) {
       throw new Error("ProcessModel.dataStores contains duplicate ids");
+    }
+    if (dataObjectIds.size !== model.dataObjects.length) {
+      throw new Error("ProcessModel.dataObjects contains duplicate ids");
+    }
+    for (const id of dataObjectIds) {
+      if (dataStoreIds.has(id)) {
+        throw new Error(`Duplicate data reference id: "${id}"`);
+      }
     }
 
     for (const processDef of model.processes) {
@@ -375,10 +449,23 @@ export class BpmnConverter {
         for (const storeId of [
           ...(node.dataInputs ?? []),
           ...(node.dataOutputs ?? []),
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
         ]) {
-          if (!dataStoreIds.has(storeId)) {
+          if (!dataStoreIds.has(storeId) && !dataObjectIds.has(storeId)) {
             throw new Error(
-              `Node "${node.id}" references unknown data store "${storeId}"`,
+              `Node "${node.id}" references unknown data reference "${storeId}"`,
+            );
+          }
+        }
+
+        for (const objectId of [
+          ...(node.dataObjectInputs ?? []),
+          ...(node.dataObjectOutputs ?? []),
+        ]) {
+          if (!dataObjectIds.has(objectId)) {
+            throw new Error(
+              `Node "${node.id}" references unknown data object "${objectId}"`,
             );
           }
         }
@@ -396,6 +483,7 @@ export class BpmnConverter {
             `SubProcess "${node.id}"`,
             allNodeIds,
             dataStoreIds,
+            dataObjectIds,
           );
         }
       }
@@ -434,6 +522,7 @@ export class BpmnConverter {
     scope: string,
     allNodeIds: Set<string>,
     dataStoreIds: Set<string>,
+    dataObjectIds: Set<string>,
   ) {
     const nodeIds = new Set(nodes.map((node) => node.id));
     if (nodeIds.size !== nodes.length) {
@@ -456,10 +545,22 @@ export class BpmnConverter {
       for (const storeId of [
         ...(node.dataInputs ?? []),
         ...(node.dataOutputs ?? []),
+        ...(node.dataObjectInputs ?? []),
+        ...(node.dataObjectOutputs ?? []),
       ]) {
-        if (!dataStoreIds.has(storeId)) {
+        if (!dataStoreIds.has(storeId) && !dataObjectIds.has(storeId)) {
           throw new Error(
-            `Node "${node.id}" references unknown data store "${storeId}"`,
+            `Node "${node.id}" references unknown data reference "${storeId}"`,
+          );
+        }
+      }
+      for (const objectId of [
+        ...(node.dataObjectInputs ?? []),
+        ...(node.dataObjectOutputs ?? []),
+      ]) {
+        if (!dataObjectIds.has(objectId)) {
+          throw new Error(
+            `Node "${node.id}" references unknown data object "${objectId}"`,
           );
         }
       }
@@ -470,6 +571,7 @@ export class BpmnConverter {
           `SubProcess "${node.id}"`,
           allNodeIds,
           dataStoreIds,
+          dataObjectIds,
         );
       }
     }

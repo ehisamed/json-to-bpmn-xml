@@ -3,6 +3,7 @@ import { INode } from "./node";
 import { IEdge } from "./edge";
 import { IMessageFlow } from "./message-flow";
 import { IDataStore } from "./data-store";
+import { IDataObject } from "./data-object";
 
 /** One process (pool participant) inside a collaboration. */
 export interface IProcessDef {
@@ -40,4 +41,6 @@ export interface ProcessModel {
 
   /** Shared data store references. */
   dataStores?: IDataStore[];
+  /** Data object references shared by process activities. */
+  dataObjects?: IDataObject[];
 }

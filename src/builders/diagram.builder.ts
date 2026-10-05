@@ -40,7 +40,12 @@ function getBoundsForType(type: string): { width: number; height: number } {
     return NODE_SIZE.event;
   }
   if (type.endsWith("Gateway")) return NODE_SIZE.gateway;
-  if (type === "bpmn:DataStoreReference") return NODE_SIZE.dataStore;
+  if (
+    type === "bpmn:DataStoreReference" ||
+    type === "bpmn:DataObjectReference"
+  ) {
+    return NODE_SIZE.dataStore;
+  }
   return NODE_SIZE.default;
 }
 
@@ -93,7 +98,7 @@ export class DiagramBuilder {
     if (!collaboration && processes.length === 1) {
       const only = processes[0]!;
       if (!only.sourceLanes.length) {
-        return this.buildFlatProcess(only);
+        return this.buildFlatProcess(only, dataAssociations);
       }
     }
 
@@ -398,7 +403,10 @@ export class DiagramBuilder {
     ]);
   }
 
-  private async buildFlatProcess(input: ProcessDiagramInput) {
+  private async buildFlatProcess(
+    input: ProcessDiagramInput,
+    dataAssociations: Array<{ id: string; association: any; fromId: string; toId: string }>,
+  ) {
     const { positions, nodeShapes, edgeShapes } = await this.layoutNodesAndEdges(
       input.elements,
       input.flows,
@@ -409,14 +417,36 @@ export class DiagramBuilder {
       false,
     );
 
+    const storeShapes: any[] = [];
+    const storePositions = new Map<string, Bounds>();
+    for (const [index, store] of (input.dataStoreElements ?? []).entries()) {
+      const bounds = {
+        x: 80 + index * 120,
+        y: 150,
+        width: NODE_SIZE.dataStore.width,
+        height: NODE_SIZE.dataStore.height,
+      };
+      storePositions.set(String(store.id), bounds);
+      storeShapes.push(this.createShape(String(store.id), store, bounds));
+    }
+    const allPositions = new Map(positions);
+    for (const [id, bounds] of storePositions) allPositions.set(id, bounds);
+    const associationShapes = dataAssociations
+      .map((association, index) => this.createBridgeEdge(
+        association.id,
+        association.association,
+        association.fromId,
+        association.toId,
+        allPositions,
+        { kind: "data", slotIndex: index, slotCount: dataAssociations.length, obstacles: [], gapTop: 0, gapBottom: 0 },
+      ))
+      .filter(Boolean);
+
     const plane = this.moddle.create("bpmndi:BPMNPlane", {
       id: "BPMNPlane_1",
       bpmnElement: input.process,
-      planeElement: [...nodeShapes, ...edgeShapes],
+      planeElement: [...nodeShapes, ...edgeShapes, ...storeShapes, ...associationShapes],
     });
-
-    // silence unused
-    void positions;
 
     return this.moddle.create("bpmndi:BPMNDiagram", {
       id: "BPMNDiagram_1",

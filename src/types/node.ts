@@ -77,6 +77,12 @@ export interface INode {
   /** Data store ids this node reads from (dataInputAssociation). */
   dataInputs?: string[];
 
+  /** Data object ids this node writes to (dataOutputAssociation). */
+  dataObjectOutputs?: string[];
+
+  /** Data object ids this node reads from (dataInputAssociation). */
+  dataObjectInputs?: string[];
+
   /** Optional DI fill/stroke (bpmn.io bioc + color extensions). */
   color?: DiColor;
 }

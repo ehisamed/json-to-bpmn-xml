@@ -1,6 +1,7 @@
 import type { ProcessModel, IProcessDef } from "../types/process";
 import type { IMessageFlow } from "../types/message-flow";
 import type { IDataStore } from "../types/data-store";
+import type { IDataObject } from "../types/data-object";
 
 export type NormalizedModel = {
   id: string;
@@ -8,6 +9,7 @@ export type NormalizedModel = {
   processes: IProcessDef[];
   messageFlows: IMessageFlow[];
   dataStores: IDataStore[];
+  dataObjects: IDataObject[];
 };
 
 /**
@@ -21,6 +23,7 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
       processes: model.processes,
       messageFlows: model.messageFlows ?? [],
       dataStores: model.dataStores ?? [],
+      dataObjects: model.dataObjects ?? [],
     };
   }
 
@@ -45,5 +48,6 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
     processes: [process],
     messageFlows: model.messageFlows ?? [],
     dataStores: model.dataStores ?? [],
+    dataObjects: model.dataObjects ?? [],
   };
 }
