@@ -19,6 +19,7 @@ import {
   inclusiveGateway,
   embeddedSubprocess,
   extendedEvents,
+  activityTypes,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -45,6 +46,7 @@ const layoutFixtures = [
   { name: "inclusiveGateway", model: inclusiveGateway },
   { name: "embeddedSubprocess", model: embeddedSubprocess },
   { name: "extendedEvents", model: extendedEvents },
+  { name: "activityTypes", model: activityTypes },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -151,5 +153,18 @@ describe("layout case fixtures", () => {
     expect(xml).toContain("<bpmn:errorEventDefinition");
     expect(xml).toContain("<bpmn:escalationEventDefinition");
     expect(xml).toContain("<bpmn:terminateEventDefinition");
+  });
+
+  it("emits the supported specialized activity types", async () => {
+    const xml = await convert(activityTypes);
+    expect(xml).toContain("<bpmn:manualTask");
+    expect(xml).toContain('implementation="email"');
+    expect(xml).toContain("<bpmn:receiveTask");
+    expect(xml).toContain('<bpmn:scriptTask id="Script"');
+    expect(xml).toContain('scriptFormat="javascript"');
+    expect(xml).toContain("return order.weight * rate;");
+    expect(xml).toContain("<bpmn:businessRuleTask");
+    expect(xml).toContain('<bpmn:callActivity id="Call"');
+    expect(xml).toContain('calledElement="CreateShipmentProcess"');
   });
 });

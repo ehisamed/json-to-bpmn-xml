@@ -27,3 +27,4 @@ export { boundaryAndConditional } from "./boundary-and-conditional";
 export { inclusiveGateway } from "./inclusive-gateway";
 export { embeddedSubprocess } from "./embedded-subprocess";
 export { extendedEvents } from "./extended-events";
+export { activityTypes } from "./activity-types";

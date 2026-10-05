@@ -5,8 +5,14 @@ export type NodeType =
   | "start"
   | "end"
   | "task"
+  | "manualTask"
   | "userTask"
   | "serviceTask"
+  | "sendTask"
+  | "receiveTask"
+  | "scriptTask"
+  | "businessRuleTask"
+  | "callActivity"
   | "subProcess"
   | "exclusiveGateway"
   | "inclusiveGateway"
@@ -48,6 +54,16 @@ export interface INode {
 
   /** Embedded subprocess body. Supported only when `type` is `subProcess`. */
   subProcess?: ISubProcessDef;
+
+  /** External process reference for `callActivity`. */
+  calledElement?: string;
+
+  /** BPMN implementation value for send/receive/service activities. */
+  implementation?: string;
+
+  /** Script body and language for `scriptTask`. */
+  script?: string;
+  scriptFormat?: string;
 
   /**
    * Multi-instance loop characteristics.

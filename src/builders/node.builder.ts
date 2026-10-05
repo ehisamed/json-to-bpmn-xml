@@ -15,6 +15,22 @@ export class NodeBuilder {
       attrs.name = node.name;
     }
 
+    if (node.calledElement !== undefined) {
+      attrs.calledElement = node.calledElement;
+    }
+
+    if (node.implementation !== undefined) {
+      attrs.implementation = node.implementation;
+    }
+
+    if (node.scriptFormat !== undefined) {
+      attrs.scriptFormat = node.scriptFormat;
+    }
+
+    if (node.script !== undefined) {
+      attrs.script = node.script;
+    }
+
     if (
       (node.type === "start" ||
         node.type === "end" ||
