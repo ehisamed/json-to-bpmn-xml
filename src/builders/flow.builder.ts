@@ -27,6 +27,16 @@ export class FlowBuilder {
 
     const flow = this.moddle.create("bpmn:SequenceFlow", attrs);
 
+    if (edge.condition !== undefined) {
+      flow.conditionExpression = this.moddle.create("bpmn:FormalExpression", {
+        body: edge.condition,
+      });
+    }
+
+    if (edge.isDefault) {
+      (source as any).default = flow;
+    }
+
     if (source) {
       source.outgoing = [...(source.outgoing ?? []), flow];
     }

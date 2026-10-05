@@ -23,3 +23,4 @@ export { gatewayLongLabel } from "./gateway-long-label";
 export { gatewayMultiToSameEnd } from "./gateway-multi-to-same-end";
 export { gatewayYesNoCross } from "./gateway-yes-no-cross";
 export { gatewayJoinBypassTop } from "./gateway-join-bypass-top";
+export { boundaryAndConditional } from "./boundary-and-conditional";

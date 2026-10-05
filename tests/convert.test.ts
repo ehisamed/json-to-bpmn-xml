@@ -1,7 +1,11 @@
 import { convert } from "../src/index";
 import type { ProcessModel } from "../src/types/process";
 import { describe, it, expect } from "vitest";
-import { advancedOrder, lanesSimpleFlow } from "../fixtures/models";
+import {
+  advancedOrder,
+  boundaryAndConditional,
+  lanesSimpleFlow,
+} from "../fixtures/models";
 
 describe("convert()", () => {
   const model: ProcessModel = {
@@ -65,6 +69,17 @@ describe("convert()", () => {
     expect(xml).toContain("<bpmn:exclusiveGateway");
     expect(xml).toContain("<bpmn:laneSet");
     expect(xml).not.toContain("laneId=");
+  });
+
+  it("emits boundary event, conditional flow, and default flow", async () => {
+    const xml = await convert(boundaryAndConditional);
+
+    expect(xml).toContain("<bpmn:boundaryEvent");
+    expect(xml).toContain('attachedToRef="Approve"');
+    expect(xml).toContain("<bpmn:timerEventDefinition");
+    expect(xml).toContain("<bpmn:conditionExpression");
+    expect(xml).toContain("approved = true");
+    expect(xml).toContain('default="Flow_Decision_Rejected"');
   });
 
   it("throws on unknown laneId", async () => {

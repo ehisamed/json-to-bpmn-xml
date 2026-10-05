@@ -11,4 +11,5 @@ export const NODE_MAP: Record<NodeType, string> = {
   parallelGateway: "bpmn:ParallelGateway",
   eventBasedGateway: "bpmn:EventBasedGateway",
   intermediateCatch: "bpmn:IntermediateCatchEvent",
+  boundaryEvent: "bpmn:BoundaryEvent",
 };

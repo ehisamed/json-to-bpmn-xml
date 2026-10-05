@@ -73,6 +73,20 @@ export class BpmnConverter {
         elements.map((el) => [String(el.id), el] as [string, FlowNode]),
       );
 
+      for (const node of processDef.nodes) {
+        if (node.type !== "boundaryEvent") continue;
+        const boundary = elementById.get(node.id) as any;
+        const attachedTo = node.attachedTo
+          ? elementById.get(node.attachedTo)
+          : undefined;
+        if (!attachedTo) {
+          throw new Error(
+            `Boundary event "${node.id}" references unknown attachedTo "${node.attachedTo ?? ""}"`,
+          );
+        }
+        boundary.attachedToRef = attachedTo;
+      }
+
       for (const [id, el] of elementById) {
         globalElementById.set(id, el);
       }
@@ -323,6 +337,9 @@ export class BpmnConverter {
       }
 
       for (const node of processDef.nodes) {
+        if (node.type === "boundaryEvent" && !node.attachedTo) {
+          throw new Error(`Boundary event "${node.id}" requires attachedTo`);
+        }
         if (node.laneId && !laneIds.has(node.laneId)) {
           throw new Error(
             `Node "${node.id}" references unknown laneId "${node.laneId}"`,

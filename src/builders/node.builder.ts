@@ -16,7 +16,9 @@ export class NodeBuilder {
     }
 
     if (
-      (node.type === "start" || node.type === "intermediateCatch") &&
+      (node.type === "start" ||
+        node.type === "intermediateCatch" ||
+        node.type === "boundaryEvent") &&
       node.eventDefinition
     ) {
       const defType =

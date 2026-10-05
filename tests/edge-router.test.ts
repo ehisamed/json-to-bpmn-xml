@@ -187,4 +187,29 @@ describe("edge-router", () => {
     const e2 = routes.get("e2")!;
     expect(e1[0]!.y).not.toBe(e2[0]!.y);
   });
+
+  it("routes a boundary-event flow around its attached activity", () => {
+    const bounds = new Map([
+      ["approve", { x: 300, y: 150, width: 100, height: 80 }],
+      ["timeout", { x: 332, y: 212, width: 36, height: 36 }],
+      ["timedOut", { x: 120, y: 40, width: 36, height: 36 }],
+    ]);
+
+    const routes = routeOrthogonalEdges(
+      [
+        {
+          id: "timeout-flow",
+          sourceId: "timeout",
+          targetId: "timedOut",
+          sourceAttachedToId: "approve",
+        },
+      ],
+      bounds,
+    );
+
+    const points = routes.get("timeout-flow")!;
+    expect(points[0]).toEqual({ x: 350, y: 248 });
+    expect(points.at(-1)).toEqual({ x: 156, y: 58 });
+    expect(points.some((p) => p.x < 288)).toBe(true);
+  });
 });

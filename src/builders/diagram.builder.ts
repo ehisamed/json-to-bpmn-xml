@@ -34,7 +34,8 @@ function getBoundsForType(type: string): { width: number; height: number } {
   if (
     type === "bpmn:StartEvent" ||
     type === "bpmn:EndEvent" ||
-    type === "bpmn:IntermediateCatchEvent"
+    type === "bpmn:IntermediateCatchEvent" ||
+    type === "bpmn:BoundaryEvent"
   ) {
     return NODE_SIZE.event;
   }
@@ -650,7 +651,7 @@ export class DiagramBuilder {
         laneHeights,
         laneOffsets,
       );
-
+      this.placeBoundaryEvents(positions, sourceNodes);
       // Recompute lane heights from final node extents.
       const maxBottomByLane = new Map<string, number>();
       for (const [id, bounds] of positions) {
@@ -715,6 +716,7 @@ export class DiagramBuilder {
     this.alignGatewayBypassTasks(positions, flows, sourceNodes);
     this.ensureAdjacentEndGaps(positions, flows, sourceNodes);
     this.resolveOverlaps(positions);
+    this.placeBoundaryEvents(positions, sourceNodes);
 
     let contentWidth = 400;
     let contentHeight = DEFAULT_POOL_HEIGHT;
@@ -734,6 +736,24 @@ export class DiagramBuilder {
       contentHeight,
       laneHeights: [],
     };
+  }
+
+  private placeBoundaryEvents(
+    positions: Map<string, Bounds>,
+    sourceNodes: INode[],
+  ) {
+    for (const node of sourceNodes) {
+      if (node.type !== "boundaryEvent" || !node.attachedTo) continue;
+      const event = positions.get(node.id);
+      const activity = positions.get(node.attachedTo);
+      if (!event || !activity) continue;
+
+      positions.set(node.id, {
+        ...event,
+        x: Math.round(activity.x + activity.width / 2 - event.width / 2),
+        y: Math.round(activity.y + activity.height - event.height / 2),
+      });
+    }
   }
 
   /**
@@ -1449,6 +1469,9 @@ export class DiagramBuilder {
         id: f.id,
         sourceId: f.source,
         targetId: f.target,
+        sourceAttachedToId: f.flow.sourceRef?.attachedToRef?.id
+          ? String(f.flow.sourceRef.attachedToRef.id)
+          : undefined,
       })),
       positions,
     );

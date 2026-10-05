@@ -10,9 +10,10 @@ export type NodeType =
   | "exclusiveGateway"
   | "parallelGateway"
   | "eventBasedGateway"
-  | "intermediateCatch";
+  | "intermediateCatch"
+  | "boundaryEvent";
 
-/** Event definition attached to start or intermediateCatch events. */
+/** Event definition attached to start, intermediateCatch, or boundary events. */
 export type EventDefinition = "timer" | "message";
 
 export interface INode {
@@ -25,6 +26,9 @@ export interface INode {
 
   /** For `start` / `intermediateCatch` — timer or message catch. */
   eventDefinition?: EventDefinition;
+
+  /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
+  attachedTo?: string;
 
   /**
    * Multi-instance loop characteristics.
