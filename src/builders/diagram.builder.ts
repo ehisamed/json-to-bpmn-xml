@@ -1421,7 +1421,8 @@ export class DiagramBuilder {
         const b = positions.get(String(el.id));
         if (!b) return null;
         const extra =
-          el.$type === "bpmn:ExclusiveGateway"
+          el.$type === "bpmn:ExclusiveGateway" ||
+          el.$type === "bpmn:InclusiveGateway"
             ? { isMarkerVisible: true }
             : undefined;
         const shape = this.createShape(String(el.id), el, b, extra);

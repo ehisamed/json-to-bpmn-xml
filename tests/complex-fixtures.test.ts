@@ -16,6 +16,7 @@ import {
   gatewayMultiToSameEnd,
   gatewayYesNoCross,
   gatewayJoinBypassTop,
+  inclusiveGateway,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -39,6 +40,7 @@ const layoutFixtures = [
   { name: "gatewayMultiToSameEnd", model: gatewayMultiToSameEnd },
   { name: "gatewayYesNoCross", model: gatewayYesNoCross },
   { name: "gatewayJoinBypassTop", model: gatewayJoinBypassTop },
+  { name: "inclusiveGateway", model: inclusiveGateway },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -103,6 +105,16 @@ describe("layout case fixtures", () => {
     expect(xml).toMatch(
       /bpmnElement="GW_Decision"[^>]*isMarkerVisible="true"/,
     );
+  });
+
+  it("inclusive gateways expose a visible marker in DI", async () => {
+    const xml = await convert(inclusiveGateway);
+    expect(xml).toContain("<bpmn:inclusiveGateway");
+    expect(xml).toMatch(
+      /bpmnElement="Split"[^>]*isMarkerVisible="true"/,
+    );
+    expect(xml).toContain("sendEmail = true");
+    expect(xml).toContain("sendSms = true");
   });
 
   it("schedulePayments timer start has clock definition", async () => {

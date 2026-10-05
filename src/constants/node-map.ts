@@ -8,6 +8,7 @@ export const NODE_MAP: Record<NodeType, string> = {
   serviceTask: "bpmn:ServiceTask",
   subProcess: "bpmn:SubProcess",
   exclusiveGateway: "bpmn:ExclusiveGateway",
+  inclusiveGateway: "bpmn:InclusiveGateway",
   parallelGateway: "bpmn:ParallelGateway",
   eventBasedGateway: "bpmn:EventBasedGateway",
   intermediateCatch: "bpmn:IntermediateCatchEvent",

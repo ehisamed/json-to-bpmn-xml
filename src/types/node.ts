@@ -8,6 +8,7 @@ export type NodeType =
   | "serviceTask"
   | "subProcess"
   | "exclusiveGateway"
+  | "inclusiveGateway"
   | "parallelGateway"
   | "eventBasedGateway"
   | "intermediateCatch"
