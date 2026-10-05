@@ -65,6 +65,10 @@ export class NodeBuilder {
       attrs.eventDefinitions = definitions.map((eventDefinition, index) =>
         this.moddle.create(defTypeByEvent[eventDefinition], {
           id: `${node.id}_${eventDefinition}Def${definitions.length > 1 ? `_${index + 1}` : ""}`,
+          ...(eventDefinition === "compensation" &&
+          node.eventDefinitionOptions?.waitForCompletion !== undefined
+            ? { waitForCompletion: node.eventDefinitionOptions.waitForCompletion }
+            : {}),
         }),
       );
     }

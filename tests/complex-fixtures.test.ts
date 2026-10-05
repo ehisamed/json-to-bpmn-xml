@@ -25,6 +25,7 @@ import {
   advancedSubprocesses,
   controlEvents,
   complexGatewayLoops,
+  compensation,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -57,6 +58,7 @@ const layoutFixtures = [
   { name: "advancedSubprocesses", model: advancedSubprocesses },
   { name: "controlEvents", model: controlEvents },
   { name: "complexGatewayLoops", model: complexGatewayLoops },
+  { name: "compensation", model: compensation },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -230,5 +232,12 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:multiInstanceLoopCharacteristics behavior="Complex"');
     expect(xml).toContain("<bpmn:loopCardinality xsi:type=\"bpmn:tFormalExpression\">3</bpmn:loopCardinality>");
     expect(xml).toContain("<bpmn:completionCondition xsi:type=\"bpmn:tFormalExpression\">approved &gt;= 2</bpmn:completionCondition>");
+  });
+
+  it("emits compensation activityRef and waitForCompletion", async () => {
+    const xml = await convert(compensation);
+    expect(xml).toContain('<bpmn:compensateEventDefinition id="Compensate_compensationDef" waitForCompletion="false"');
+    expect(xml).toContain('activityRef="UndoCharge"');
+    expect(xml).toContain('attachedToRef="ChargeCard"');
   });
 });

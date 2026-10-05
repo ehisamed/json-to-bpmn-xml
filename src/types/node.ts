@@ -58,6 +58,12 @@ export interface INode {
   /** Multiple event definitions on one event, such as timer OR message. */
   eventDefinitions?: EventDefinition[];
 
+  /** Optional parameters for an event definition, currently used by compensation. */
+  eventDefinitionOptions?: {
+    activityRef?: string;
+    waitForCompletion?: boolean;
+  };
+
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
 

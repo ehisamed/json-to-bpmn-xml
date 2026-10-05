@@ -400,6 +400,23 @@ export class BpmnConverter {
     );
 
     for (const node of nodes) {
+      const activityRef = node.eventDefinitionOptions?.activityRef;
+      if (!activityRef) continue;
+      const source = elementById.get(node.id) as any;
+      const activity = elementById.get(activityRef);
+      if (!activity) {
+        throw new Error(
+          `Node "${node.id}" eventDefinition references unknown activity "${activityRef}"`,
+        );
+      }
+      for (const definition of source?.eventDefinitions ?? []) {
+        if (definition.$type === "bpmn:CompensateEventDefinition") {
+          definition.activityRef = activity;
+        }
+      }
+    }
+
+    for (const node of nodes) {
       if (node.type === "boundaryEvent") {
         const boundary = elementById.get(node.id) as any;
         const attachedTo = node.attachedTo

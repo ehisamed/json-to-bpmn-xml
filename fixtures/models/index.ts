@@ -33,3 +33,4 @@ export { artifacts } from "./artifacts";
 export { advancedSubprocesses } from "./advanced-subprocesses";
 export { controlEvents } from "./control-events";
 export { complexGatewayLoops } from "./complex-gateway-loops";
+export { compensation } from "./compensation";
