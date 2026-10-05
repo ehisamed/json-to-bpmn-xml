@@ -17,14 +17,21 @@ export class NodeBuilder {
 
     if (
       (node.type === "start" ||
+        node.type === "end" ||
         node.type === "intermediateCatch" ||
         node.type === "boundaryEvent") &&
       node.eventDefinition
     ) {
-      const defType =
-        node.eventDefinition === "timer"
-          ? "bpmn:TimerEventDefinition"
-          : "bpmn:MessageEventDefinition";
+      const defTypeByEvent = {
+        timer: "bpmn:TimerEventDefinition",
+        message: "bpmn:MessageEventDefinition",
+        signal: "bpmn:SignalEventDefinition",
+        conditional: "bpmn:ConditionalEventDefinition",
+        error: "bpmn:ErrorEventDefinition",
+        escalation: "bpmn:EscalationEventDefinition",
+        terminate: "bpmn:TerminateEventDefinition",
+      } as const;
+      const defType = defTypeByEvent[node.eventDefinition];
 
       attrs.eventDefinitions = [
         this.moddle.create(defType, {

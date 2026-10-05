@@ -18,6 +18,7 @@ import {
   gatewayJoinBypassTop,
   inclusiveGateway,
   embeddedSubprocess,
+  extendedEvents,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -43,6 +44,7 @@ const layoutFixtures = [
   { name: "gatewayJoinBypassTop", model: gatewayJoinBypassTop },
   { name: "inclusiveGateway", model: inclusiveGateway },
   { name: "embeddedSubprocess", model: embeddedSubprocess },
+  { name: "extendedEvents", model: extendedEvents },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -140,5 +142,14 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('bpmnElement="Verify" isExpanded="true"');
     expect(xml).toContain('bpmnElement="VerifyStart"');
     expect(xml).toContain('bpmnElement="VerifyFlow_1"');
+  });
+
+  it("emits extended event definitions", async () => {
+    const xml = await convert(extendedEvents);
+    expect(xml).toContain("<bpmn:signalEventDefinition");
+    expect(xml).toContain("<bpmn:conditionalEventDefinition");
+    expect(xml).toContain("<bpmn:errorEventDefinition");
+    expect(xml).toContain("<bpmn:escalationEventDefinition");
+    expect(xml).toContain("<bpmn:terminateEventDefinition");
   });
 });

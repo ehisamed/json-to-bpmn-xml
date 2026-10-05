@@ -15,8 +15,15 @@ export type NodeType =
   | "intermediateCatch"
   | "boundaryEvent";
 
-/** Event definition attached to start, intermediateCatch, or boundary events. */
-export type EventDefinition = "timer" | "message";
+/** Event definition attached to supported BPMN events. */
+export type EventDefinition =
+  | "timer"
+  | "message"
+  | "signal"
+  | "conditional"
+  | "error"
+  | "escalation"
+  | "terminate";
 
 export interface ISubProcessDef {
   nodes: INode[];
