@@ -22,6 +22,7 @@ import {
   activityTypes,
   dataObjects,
   artifacts,
+  advancedSubprocesses,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -51,6 +52,7 @@ const layoutFixtures = [
   { name: "activityTypes", model: activityTypes },
   { name: "dataObjects", model: dataObjects },
   { name: "artifacts", model: artifacts },
+  { name: "advancedSubprocesses", model: advancedSubprocesses },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -194,5 +196,16 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('sourceRef="Approve"');
     expect(xml).toContain('targetRef="Note_Compliance"');
     expect(xml).toMatch(/bpmnElement="Note_Compliance"[\s\S]*?<dc:Bounds/);
+  });
+
+  it("emits event and transaction subprocesses", async () => {
+    const xml = await convert(advancedSubprocesses);
+    expect(xml).toContain('<bpmn:transaction id="FulfillTransaction"');
+    expect(xml).toContain('triggeredByEvent="true"');
+    expect(xml).toContain('<bpmn:subProcess id="RecoveryEvents"');
+    expect(xml).toContain('<bpmn:startEvent id="RecoveryStart"');
+    expect(xml).toContain('<bpmn:errorEventDefinition');
+    expect(xml).toContain('bpmnElement="FulfillTransaction" isExpanded="true"');
+    expect(xml).toContain('bpmnElement="RecoveryEvents" isExpanded="true"');
   });
 });

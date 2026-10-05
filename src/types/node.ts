@@ -36,6 +36,8 @@ export interface ISubProcessDef {
   edges: IEdge[];
   /** Render the embedded body inside the subprocess shape when true. */
   expanded?: boolean;
+  /** BPMN subprocess specialization. `event` emits triggeredByEvent; `transaction` emits bpmn:Transaction. */
+  subProcessType?: "event" | "transaction";
 }
 
 export interface INode {

@@ -6,13 +6,20 @@ export class NodeBuilder {
   constructor(private moddle: BPMNModdleInstance) {}
 
   build(node: INode) {
-    const type = NODE_MAP[node.type];
+    const type =
+      node.type === "subProcess" && node.subProcess?.subProcessType === "transaction"
+        ? "bpmn:Transaction"
+        : NODE_MAP[node.type];
     const attrs: Record<string, unknown> = {
       id: node.id,
     };
 
     if (node.name !== undefined) {
       attrs.name = node.name;
+    }
+
+    if (node.type === "subProcess" && node.subProcess?.subProcessType === "event") {
+      attrs.triggeredByEvent = true;
     }
 
     if (node.calledElement !== undefined) {
