@@ -11,7 +11,7 @@
 
 ## 1. Два режима одного корневого объекта
 
-`ProcessModel` допускает две формы. Внутри они нормализуются к одному виду (`processes[]` + опционально `messageFlows` / `dataStores`).
+`ProcessModel` допускает две формы. Внутри они нормализуются к одному виду (`processes[]` + опционально message flows, data references и artifacts).
 
 | Режим | Когда использовать | Что заполнять |
 | ----- | ------------------ | ------------- |
@@ -35,7 +35,10 @@ ProcessModel
 └── [Коллаборация]
     ├── processes?
     ├── messageFlows?
-    └── dataStores?
+    ├── dataStores?
+    ├── dataObjects?
+    ├── textAnnotations? / groups?
+    └── associations?
 ```
 
 ---
@@ -52,6 +55,10 @@ ProcessModel
 | `processes` | `IProcessDef[]` | collab: **да*** | Один элемент = один пул/процесс. *Нужен для multi-pool. |
 | `messageFlows` | `IMessageFlow[]` | нет | Пунктирные сообщения **между процессами**. |
 | `dataStores` | `IDataStore[]` | нет | Общие data store (цилиндры). |
+| `dataObjects` | `IDataObject[]` | нет | Ссылки на документы/data objects. |
+| `textAnnotations` | `ITextAnnotation[]` | нет | Текстовые аннотации. |
+| `groups` | `IGroup[]` | нет | BPMN group artifacts. |
+| `associations` | `IAssociation[]` | нет | Ассоциации между узлами/artifacts. |
 
 ### Зачем два режима?
 
@@ -63,7 +70,8 @@ ProcessModel
 - Нет `x` / `y` / waypoints — layout автоматический.
 - Нет кусков сырого BPMN XML.
 - Атрибут `laneId` **не** попадает на flow-узлы в XML (только `laneSet` / `flowNodeRef`).
-- Содержимое вложенного subprocess пока не моделируется (`subProcess` — свёрнутый/пустой).
+- Содержимое subprocess задаётся через `subProcess.nodes` / `subProcess.edges`; для раскрытой DI-картинки укажите `expanded: true`.
+- `subProcessType: "event"` создаёт event subprocess, `subProcessType: "transaction"` — transaction subprocess.
 
 ---
 
@@ -126,10 +134,14 @@ Collaboration создаётся, если верно хотя бы одно:
 | `type` | `NodeType` | **да** | См. таблицу ниже. |
 | `name` | `string` | нет | Подпись на диаграмме. |
 | `laneId` | `string` | нет | Если задан — должен существовать в `lanes` родительского процесса. |
-| `eventDefinition` | `"timer" \| "message"` | условно | Для `start` и `intermediateCatch`. |
-| `multiInstance` | `boolean \| { sequential?: boolean }` | нет | Маркер multi-instance на задачах / subprocess. |
+| `eventDefinition` | `EventDefinition` | условно | Одно определение события. |
+| `eventDefinitions` | `EventDefinition[]` | нет | Несколько определений на одном событии. |
+| `eventDefinitionOptions` | object | нет | Настройки compensation и link. |
+| `multiInstance` | `boolean \| object` | нет | Маркер и параметры loop. |
 | `dataInputs` | `string[]` | нет | Id из корневых `dataStores` (чтение). |
 | `dataOutputs` | `string[]` | нет | Id из корневых `dataStores` (запись). |
+| `dataObjectInputs` | `string[]` | нет | Id из корневых `dataObjects` (чтение). |
+| `dataObjectOutputs` | `string[]` | нет | Id из корневых `dataObjects` (запись). |
 | `color` | `DiColor` | нет | Заливка/обводка DI (bioc + color bpmn.io). |
 
 ### `NodeType` → элемент BPMN
@@ -141,11 +153,14 @@ Collaboration создаётся, если верно хотя бы одно:
 | `task` | Task | Обычная активность |
 | `userTask` | UserTask | Пользовательская задача |
 | `serviceTask` | ServiceTask | Сервис / автоматизация |
-| `subProcess` | SubProcess | Свёрнутый subprocess (тело пока пустое) |
+| `subProcess` | SubProcess / Transaction | Вложенный, event или transaction subprocess |
 | `exclusiveGateway` | ExclusiveGateway | XOR-развилка / слияние |
 | `parallelGateway` | ParallelGateway | AND-разветвление / соединение |
 | `eventBasedGateway` | EventBasedGateway | Ждать первое из catch-событий |
 | `intermediateCatch` | IntermediateCatchEvent | Промежуточный catch (timer/message) |
+| `complexGateway` | ComplexGateway | Сложная логика активации/слияния |
+| `intermediateThrow` | IntermediateThrowEvent | Link throw event |
+| `boundaryEvent` | BoundaryEvent | Событие на activity |
 
 Другие значения `type` недопустимы (TypeScript + runtime-карта).
 
@@ -153,8 +168,7 @@ Collaboration создаётся, если верно хотя бы одно:
 
 | Где применимо | Значения | Смысл |
 | ------------- | -------- | ----- |
-| `start` | `timer`, `message` | Стартовое timer / message |
-| `intermediateCatch` | `timer`, `message` | На практике **нужно** для осмысленного catch; без определения событие «пустое» |
+| event nodes | `timer`, `message`, `signal`, `conditional`, `error`, `escalation`, `terminate`, `cancel`, `compensation`, `link` | Event definition |
 | Остальные типы | — | Если указано — игнорируется |
 
 **Почему так:** в BPMN «none» и timer/message отличаются event definition, а не отдельным JSON-типом на каждый вариант.
@@ -167,6 +181,9 @@ Collaboration создаётся, если верно хотя бы одно:
 | `true` | Параллельный multi-instance |
 | `{ sequential: true }` | Последовательный MI (`isSequential="true"`) |
 | `{ sequential: false }` | Как параллельный |
+| `{ loopCardinality: 3 }` | Выражение cardinality |
+| `{ completionCondition: "approved >= 2" }` | Остановить MI при истинном выражении |
+| `{ behavior: "All" \| "One" \| "Complex" }` | Поведение завершения MI |
 
 Имеет смысл на активностях (`task`, `userTask`, `serviceTask`, `subProcess`). На событиях/шлюзах обычно не ставят.
 
@@ -177,6 +194,21 @@ Collaboration создаётся, если верно хотя бы одно:
 - `dataInputs` → `dataInputAssociation` (узел читает; для валидности BPMN создаётся placeholder-`property`).
 
 **Владение store:** каждый data store вешается на **первый** процесс, который на него ссылается (или на первый процесс, если ссылок нет). На диаграмме store часто рисуется в зазоре между пулами.
+
+### `dataObjects`
+
+`dataObjects[]` использует `{ id, name?, isCollection?, color? }`. Поля `dataObjectInputs` и `dataObjectOutputs` создают ассоциации с `bpmn:dataObjectReference`.
+
+### `eventDefinitionOptions`
+
+- Compensation: `{ activityRef: "UndoCharge", waitForCompletion: false }`.
+- Link: `{ linkName: "ReviewHandoff", linkDirection: "source" | "target" }`. Source и target с одинаковым `linkName` связываются.
+
+### Artifacts
+
+- `textAnnotations[]`: `{ id, text, color? }`.
+- `groups[]`: `{ id, name?, categoryValue?, color? }`.
+- `associations[]`: `{ id, source, target, associationDirection? }`.
 
 ### `color` (`DiColor`)
 
@@ -268,6 +300,8 @@ Namespaces на `definitions` добавляются только если в м
 | Все `nodes[].id` | **Глобально** по всем процессам |
 | `lanes[].id` | Внутри одного процесса |
 | `dataStores[].id` | Среди data stores |
+| `dataObjects[].id` | Среди data objects и data stores |
+| Artifact ids | Среди annotations, groups, nodes и data references |
 | `edges[].id` / `messageFlows[].id` | Желательно уникальны (дефолты по индексу) |
 
 **Почему node id глобальные?** Message flow и карты диаграммы ищут элементы по id во всей коллаборации.
@@ -417,6 +451,10 @@ type ProcessModel = {
   processes?: IProcessDef[];
   messageFlows?: IMessageFlow[];
   dataStores?: IDataStore[];
+  dataObjects?: IDataObject[];
+  textAnnotations?: ITextAnnotation[];
+  groups?: IGroup[];
+  associations?: IAssociation[];
 };
 
 type IProcessDef = {
@@ -433,20 +471,29 @@ type INode = {
   id: string;
   type:
     | "start" | "end" | "task" | "userTask" | "serviceTask" | "subProcess"
-    | "exclusiveGateway" | "parallelGateway" | "eventBasedGateway"
-    | "intermediateCatch";
+    | "exclusiveGateway" | "parallelGateway" | "inclusiveGateway" | "complexGateway"
+    | "eventBasedGateway" | "intermediateCatch" | "intermediateThrow" | "boundaryEvent";
   name?: string;
   laneId?: string;
-  eventDefinition?: "timer" | "message";
-  multiInstance?: boolean | { sequential?: boolean };
+  eventDefinition?: EventDefinition;
+  eventDefinitions?: EventDefinition[];
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target" };
+  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
+  multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
   dataOutputs?: string[];
+  dataObjectInputs?: string[];
+  dataObjectOutputs?: string[];
   color?: { stroke?: string; fill?: string };
 };
 
 type IEdge = { id?: string; source: string; target: string; name?: string };
 type IMessageFlow = { id?: string; source: string; target: string; name?: string };
 type IDataStore = { id: string; name?: string; color?: { stroke?: string; fill?: string } };
+type IDataObject = { id: string; name?: string; isCollection?: boolean; color?: { stroke?: string; fill?: string } };
+type ITextAnnotation = { id: string; text: string; color?: { stroke?: string; fill?: string } };
+type IGroup = { id: string; name?: string; categoryValue?: string; color?: { stroke?: string; fill?: string } };
+type IAssociation = { id: string; source: string; target: string; associationDirection?: "None" | "One" | "Both" };
 ```
 
 Экспорт пакета: `ProcessModel`, `IProcessDef`, `INode`, `IEdge`, `ILane`, `IMessageFlow`, `IDataStore`, `DiColor`, `NodeType`, `EventDefinition`.
