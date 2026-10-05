@@ -14,7 +14,7 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 - English: [docs/json-schema.en.md](./docs/json-schema.en.md)
 - Русский: [docs/json-schema.ru.md](./docs/json-schema.ru.md)
 
-<img src="./assets/advanced-order-process.png" alt="Advanced Order Process with lanes" width="100%" />
+<img src="./assets/readme-example.svg" alt="Simple BPMN process example" width="100%" />
 
 ## Features
 
