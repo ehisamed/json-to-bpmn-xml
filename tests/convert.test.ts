@@ -189,4 +189,129 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/only one of timeDate, timeDuration, or timeCycle/);
   });
+
+  it("validates event subprocess structure", async () => {
+    const baseSubprocess = {
+      id: "Handler",
+      type: "subProcess" as const,
+      subProcess: {
+        subProcessType: "event" as const,
+        nodes: [
+          { id: "HandlerStart", type: "start" as const, eventDefinition: "error" as const },
+          { id: "HandlerEnd", type: "end" as const },
+        ],
+        edges: [{ source: "HandlerStart", target: "HandlerEnd" }],
+      },
+    };
+
+    await expect(
+      convert({
+        id: "event-subprocess-flow",
+        nodes: [
+          { id: "start", type: "start" },
+          baseSubprocess,
+          { id: "end", type: "end" },
+        ],
+        edges: [{ source: "start", target: "Handler" }],
+      }),
+    ).rejects.toThrow(/cannot have incoming or outgoing sequence flows/);
+
+    await expect(
+      convert({
+        id: "event-subprocess-start",
+        nodes: [
+          {
+            ...baseSubprocess,
+            subProcess: {
+              ...baseSubprocess.subProcess,
+              nodes: [
+                { id: "HandlerStart", type: "start" },
+                { id: "HandlerEnd", type: "end" },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must define an event definition/);
+  });
+
+  it("validates boundary event attachment and definitions", async () => {
+    const boundary = {
+      id: "Boundary",
+      type: "boundaryEvent" as const,
+      attachedTo: "Task",
+      eventDefinition: "timer" as const,
+    };
+
+    await expect(
+      convert({
+        id: "boundary-incoming",
+        nodes: [
+          { id: "Task", type: "userTask" },
+          boundary,
+          { id: "Start", type: "start" },
+        ],
+        edges: [{ source: "Start", target: "Boundary" }],
+      }),
+    ).rejects.toThrow(/cannot have incoming sequence flows/);
+
+    await expect(
+      convert({
+        id: "boundary-invalid-definition",
+        nodes: [
+          { id: "Task", type: "userTask" },
+          {
+            ...boundary,
+            eventDefinitions: ["timer", "message"],
+            eventDefinition: undefined,
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must define exactly one event definition/);
+
+    await expect(
+      convert({
+        id: "boundary-invalid-target",
+        nodes: [
+          { id: "Start", type: "start" },
+          {
+            ...boundary,
+            attachedTo: "Start",
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must attach to an activity/);
+  });
+
+  it("validates compensation handlers and cancel boundary targets", async () => {
+    await expect(
+      convert({
+        id: "compensation-handler-flow",
+        nodes: [
+          { id: "Task", type: "serviceTask", isForCompensation: true },
+          { id: "Start", type: "start" },
+        ],
+        edges: [{ source: "Start", target: "Task" }],
+      }),
+    ).rejects.toThrow(/cannot have normal sequence flows/);
+
+    await expect(
+      convert({
+        id: "cancel-boundary-target",
+        nodes: [
+          { id: "Task", type: "serviceTask" },
+          {
+            id: "Cancel",
+            type: "boundaryEvent",
+            attachedTo: "Task",
+            eventDefinition: "cancel",
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must attach to a transaction subprocess/);
+  });
 });

@@ -71,7 +71,7 @@ ProcessModel
 - No raw BPMN XML fragments.
 - No `laneId` attribute on emitted flow nodes (lanes are only via `laneSet` / `flowNodeRef`).
 - Nested subprocess contents use `subProcess.nodes` / `subProcess.edges`; set `expanded: true` for expanded DI.
-- `subProcessType: "event"` emits an event subprocess; `subProcessType: "transaction"` emits a transaction subprocess.
+- `subProcessType: "event"` emits an event subprocess; `subProcessType: "transaction"` emits a transaction subprocess. Event subprocesses cannot have parent sequence flows, require event-defined start events, and support `interrupting?: boolean` (default `true`).
 
 ---
 
@@ -249,6 +249,10 @@ eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOp
 ```
 
 This allows timer, message, signal, error, escalation, and other definitions to carry independent parameters. The older `eventDefinitionOptions` remains the fallback for backward compatibility.
+
+Boundary events use `cancelActivity?: boolean` (`true` by default) to select interrupting or non-interrupting behavior. A boundary event must attach to an activity, have exactly one supported event definition, and cannot have incoming sequence flows.
+
+Mark a compensation handler with `isForCompensation: true`. Compensation handlers cannot participate in normal sequence flow. A boundary compensation event must provide `activityRef` pointing to such a handler. A cancel boundary event must attach to a transaction subprocess.
 
 ### Artifacts
 
@@ -525,9 +529,11 @@ type INode = {
   eventDefinitions?: EventDefinition[];
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
+  cancelActivity?: boolean;
+  isForCompensation?: boolean;
   messageRef?: string;
   signalRef?: string;
-  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
+  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };
   multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
   dataOutputs?: string[];

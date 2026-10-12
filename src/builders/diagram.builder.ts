@@ -806,16 +806,30 @@ export class DiagramBuilder {
     positions: Map<string, Bounds>,
     sourceNodes: INode[],
   ) {
+    const boundaryByActivity = new Map<string, INode[]>();
     for (const node of sourceNodes) {
       if (node.type !== "boundaryEvent" || !node.attachedTo) continue;
-      const event = positions.get(node.id);
-      const activity = positions.get(node.attachedTo);
-      if (!event || !activity) continue;
+      const events = boundaryByActivity.get(node.attachedTo) ?? [];
+      events.push(node);
+      boundaryByActivity.set(node.attachedTo, events);
+    }
 
-      positions.set(node.id, {
-        ...event,
-        x: Math.round(activity.x + activity.width / 2 - event.width / 2),
-        y: Math.round(activity.y + activity.height - event.height / 2),
+    const gap = 12;
+    for (const [activityId, events] of boundaryByActivity) {
+      const activity = positions.get(activityId);
+      if (!activity) continue;
+      const eventWidth = positions.get(events[0]!.id)?.width ?? 36;
+      const totalWidth = events.length * eventWidth + (events.length - 1) * gap;
+      const startX = activity.x + activity.width / 2 - totalWidth / 2;
+
+      events.forEach((node, index) => {
+        const event = positions.get(node.id);
+        if (!event) return;
+        positions.set(node.id, {
+          ...event,
+          x: Math.round(startX + index * (eventWidth + gap)),
+          y: Math.round(activity.y + activity.height - event.height / 2),
+        });
       });
     }
   }
@@ -1491,6 +1505,17 @@ export class DiagramBuilder {
     positions: Map<string, Bounds>,
     sourceNodes: INode[] = [],
   ) {
+    const boundaryLabelIndex = new Map<string, number>();
+    for (const node of sourceNodes) {
+      if (node.type !== "boundaryEvent" || !node.attachedTo) continue;
+      const peers = sourceNodes.filter(
+        (candidate) =>
+          candidate.type === "boundaryEvent" &&
+          candidate.attachedTo === node.attachedTo,
+      );
+      boundaryLabelIndex.set(node.id, peers.findIndex((peer) => peer.id === node.id));
+    }
+
     return elements
       .map((el) => {
         const b = positions.get(String(el.id));
@@ -1510,7 +1535,18 @@ export class DiagramBuilder {
         const isGateway = String(el.$type ?? "").includes("Gateway");
         // Gateway labels sit under the diamond by default and collide with
         // bottom exits. Emit a label shifted left; widen long names.
-        if (isGateway && name.length > 0) {
+        if (sourceNode?.type === "boundaryEvent" && name.length > 0) {
+          const labelW = Math.min(180, Math.max(100, name.length * 7));
+          const row = boundaryLabelIndex.get(sourceNode.id) ?? 0;
+          shape.label = this.moddle.create("bpmndi:BPMNLabel", {
+            bounds: this.moddle.create("dc:Bounds", {
+              x: Math.round(b.x + b.width / 2 - labelW / 2),
+              y: Math.round(b.y + b.height + 2 + row * 24),
+              width: labelW,
+              height: 20,
+            }),
+          });
+        } else if (isGateway && name.length > 0) {
           const labelW = Math.min(
             240,
             Math.max(name.length >= 14 ? 100 : 72, name.length * 7),

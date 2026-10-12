@@ -38,6 +38,14 @@ export class NodeBuilder {
       attrs.script = node.script;
     }
 
+    if (node.type === "boundaryEvent" && node.cancelActivity !== undefined) {
+      attrs.cancelActivity = node.cancelActivity;
+    }
+
+    if (node.isForCompensation !== undefined) {
+      attrs.isForCompensation = node.isForCompensation;
+    }
+
     if (
       (node.type === "start" ||
         node.type === "end" ||

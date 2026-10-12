@@ -31,6 +31,8 @@ import {
   errorEscalationReferences,
   timerParameters,
   multipleEventParameters,
+  boundarySemantics,
+  compensationCancelSemantics,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -69,6 +71,8 @@ const layoutFixtures = [
   { name: "errorEscalationReferences", model: errorEscalationReferences },
   { name: "timerParameters", model: timerParameters },
   { name: "multipleEventParameters", model: multipleEventParameters },
+  { name: "boundarySemantics", model: boundarySemantics },
+  { name: "compensationCancelSemantics", model: compensationCancelSemantics },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -131,6 +135,18 @@ describe("complex fixtures", () => {
     );
     expect(xml).toContain('messageRef="Message_InvoiceReceived"');
     expect(xml).toContain('signalRef="Signal_InvoiceApproved"');
+  });
+
+  it("emits interrupting and non-interrupting boundary events", async () => {
+    const xml = await convert(boundarySemantics);
+    expect(xml).toContain('<bpmn:boundaryEvent id="Timeout"');
+    expect(xml).toContain('<bpmn:boundaryEvent id="Reminder"');
+    expect(xml).toMatch(
+      /<bpmn:boundaryEvent id="Reminder"[^>]*cancelActivity="false"/,
+    );
+    expect(xml).toContain('attachedToRef="Review"');
+    expect(xml).toContain('errorRef="Error_PaymentFailed"');
+    expect(xml).toContain('messageRef="Message_Reminder"');
   });
 
   it("incidentResponse uses timer start on ops", async () => {
@@ -264,6 +280,9 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:subProcess id="RecoveryEvents"');
     expect(xml).toContain('<bpmn:startEvent id="RecoveryStart"');
     expect(xml).toContain('<bpmn:errorEventDefinition');
+    expect(xml).toMatch(
+      /<bpmn:startEvent id="RecoveryStart"[^>]*isInterrupting="false"/,
+    );
     expect(xml).toContain('bpmnElement="FulfillTransaction" isExpanded="true"');
     expect(xml).toContain('bpmnElement="RecoveryEvents" isExpanded="true"');
   });
@@ -292,6 +311,14 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:compensateEventDefinition id="Compensate_compensationDef" waitForCompletion="false"');
     expect(xml).toContain('activityRef="UndoCharge"');
     expect(xml).toContain('attachedToRef="ChargeCard"');
+  });
+
+  it("emits transaction cancel and compensation semantics", async () => {
+    const xml = await convert(compensationCancelSemantics);
+    expect(xml).toContain('<bpmn:cancelEventDefinition');
+    expect(xml).toContain('isForCompensation="true"');
+    expect(xml).toContain('activityRef="UndoReserve"');
+    expect(xml).toContain('attachedToRef="Transaction"');
   });
 
   it("connects link event definitions by name", async () => {

@@ -60,6 +60,8 @@ export interface ISubProcessDef {
   expanded?: boolean;
   /** BPMN subprocess specialization. `event` emits triggeredByEvent; `transaction` emits bpmn:Transaction. */
   subProcessType?: "event" | "transaction";
+  /** Whether event subprocess start events interrupt the enclosing process. Defaults to true. */
+  interrupting?: boolean;
 }
 
 export interface INode {
@@ -86,6 +88,12 @@ export interface INode {
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
+
+  /** Whether a boundary event interrupts its attached activity. Defaults to true. */
+  cancelActivity?: boolean;
+
+  /** Marks an activity as a compensation handler outside the normal flow. */
+  isForCompensation?: boolean;
 
   /** Embedded subprocess body. Supported only when `type` is `subProcess`. */
   subProcess?: ISubProcessDef;
