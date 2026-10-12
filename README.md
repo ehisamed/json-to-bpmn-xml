@@ -2,19 +2,22 @@
 
 [![npm version](https://img.shields.io/npm/v/json-to-bpmn-xml.svg)](https://www.npmjs.com/package/json-to-bpmn-xml)
 ![status](https://img.shields.io/badge/status-active%20development-yellow)
-![build](https://img.shields.io/badge/build-passing-brightgreen)
 
-Convert JSON workflow definitions into **valid, formatted BPMN 2.0 XML** with diagram layout (BPMNDI).
+**json-to-bpmn-xml** is an ESM JavaScript / TypeScript library that converts structured JSON workflow definitions into **formatted BPMN 2.0 XML with automatic diagram layout (BPMNDI)**. Define nodes, sequence flows, swimlanes and collaborating processes; `await convert(model)` returns an XML string with diagram shapes and edge waypoints.
 
-The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda Modeler: process semantics, swimlanes, and orthogonal sequence flows.
+Use it to generate BPMN diagrams from application data, export workflow configurations to modeling tools, or turn an AI-generated `ProcessModel` into BPMN XML. AI callers must produce the documented input structure; the library accepts structured models, not natural-language prompts.
+
+The output includes both process elements and diagram coordinates for viewing in tools such as [bpmn.io](https://demo.bpmn.io) and Camunda Modeler. The library combines BPMN serialization through `bpmn-moddle` with ELK layout and custom orthogonal routing, including swimlanes, multiple pools, message flows and data associations.
+
+**Scope:** generates diagrams, not workflow execution. Processes are emitted with `isExecutable="false"`; deployment to an engine requires engine-specific configuration. Input validation checks model structure and references, and repository tests parse the output with `bpmn-moddle`; these checks do not establish full BPMN semantic or XSD conformance. Event definitions describe event types; the current input API does not expose timer schedules or message correlation settings.
 
 **JSON structure reference (full rules, nesting, types):**
 
-- Docs index: [docs/README.md](./docs/README.md)
-- English: [docs/json-schema.en.md](./docs/json-schema.en.md)
-- Русский: [docs/json-schema.ru.md](./docs/json-schema.ru.md)
+- Docs index: [Documentation](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/README.md)
+- English: [Input model reference](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/json-schema.en.md)
+- Русский: [Структура входной модели](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/json-schema.ru.md)
 
-<img src="./assets/readme-example.svg" alt="Simple BPMN process example" width="100%" />
+<img src="https://raw.githubusercontent.com/ehisamed/json-to-bpmn-xml/main/assets/readme-example.svg" alt="Simple BPMN process example" width="100%" />
 
 ## Features
 
@@ -40,14 +43,20 @@ The output opens cleanly in tools like [bpmn.io](https://demo.bpmn.io) / Camunda
 | `task` | `bpmn:Task` | generic task |
 | `userTask` | `bpmn:UserTask` | |
 | `serviceTask` | `bpmn:ServiceTask` | |
-| `subProcess` | `bpmn:SubProcess` | collapsed (empty body) |
+| `manualTask` | `bpmn:ManualTask` | |
+| `sendTask` | `bpmn:SendTask` | optional `implementation` |
+| `receiveTask` | `bpmn:ReceiveTask` | optional `implementation` |
+| `scriptTask` | `bpmn:ScriptTask` | optional `script`, `scriptFormat` |
+| `businessRuleTask` | `bpmn:BusinessRuleTask` | |
+| `callActivity` | `bpmn:CallActivity` | optional `calledElement` |
+| `subProcess` | `bpmn:SubProcess` / `bpmn:Transaction` | collapsed or nested; event / transaction specialization |
 | `exclusiveGateway` | `bpmn:ExclusiveGateway` | |
 | `parallelGateway` | `bpmn:ParallelGateway` | |
 | `inclusiveGateway` | `bpmn:InclusiveGateway` | |
 | `complexGateway` | `bpmn:ComplexGateway` | |
 | `eventBasedGateway` | `bpmn:EventBasedGateway` | |
 | `intermediateCatch` | `bpmn:IntermediateCatchEvent` | catch definitions |
-| `intermediateThrow` | `bpmn:IntermediateThrowEvent` | link throw events |
+| `intermediateThrow` | `bpmn:IntermediateThrowEvent` | throw definitions, including link events |
 | `boundaryEvent` | `bpmn:BoundaryEvent` | requires `attachedTo` |
 
 Common node options: `multiInstance`, `eventDefinition(s)`, `eventDefinitionOptions`, `dataInputs`, `dataOutputs`, `dataObjectInputs`, `dataObjectOutputs`, `laneId`.
@@ -136,7 +145,13 @@ const xml = await convert(advancedOrder);
 
 ### Collaboration example (two pools)
 
-`accountsPayable` is the full Accounts Payable sample: Finance + CFO lanes, Schedule Payments pool, event-based gateway, message flows, and a shared data store.
+`accountsPayable` is a complete Accounts Payable diagram example: **2 pools, 2 lanes, 19 nodes, 20 sequence flows, 2 message flows and 1 shared data store**. Finance checks an invoice, the CFO approves it, and a separate process schedules payments. The diagram includes an event-based gateway with timer and message catches, a collapsed subprocess, sequential / parallel multi-instance activities and DI colors.
+
+[Full example walkthrough](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/accounts-payable.md) · [JSON input](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/examples/accounts-payable.json) · [Generated BPMN XML](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/docs/examples/accounts-payable.bpmn) · [Source fixture](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/fixtures/models/accounts-payable.ts)
+
+![Accounts Payable BPMN diagram with Finance and CFO lanes, a Schedule Payments pool, message flows and a shared Due Invoices data store](https://raw.githubusercontent.com/ehisamed/json-to-bpmn-xml/main/assets/accounts-payable.png)
+
+The complete JSON and generated XML are committed under `docs/examples/` and included in the npm package. The fixture demonstrates diagram generation; its timer and message definitions do not configure an executable payment workflow.
 
 ```bash
 npm run local
@@ -147,7 +162,7 @@ Swap the import in `scripts/local-run.ts` to try `incidentResponse`, `advancedOr
 
 ## Real BPMN cases
 
-The repository includes executable fixtures for the main patterns used in hand-built BPMN diagrams. Every fixture is converted to XML, parsed back with `bpmn-moddle`, and rendered to PNG.
+The repository includes runnable fixtures for the main patterns used in hand-built BPMN diagrams. Tests convert every exported fixture to XML and parse it back with `bpmn-moddle`, requiring zero parser warnings. PNG rendering is a separate local preview command.
 
 ### Invoice document flow
 
@@ -252,6 +267,21 @@ An event can wait for more than one trigger. Link events use the same `linkName`
 | `linkEvents` | link throw/catch pair |
 
 Run `npm run preview` to render every fixture to `.bpmn` and `.png`.
+
+## Capability evidence
+
+Use these links to verify claims against the input contract, implementation and tests. The schema reference is prose documentation, not a machine-readable JSON Schema validator.
+
+| Capability | Implementation / input contract | Verification |
+| --- | --- | --- |
+| Node and event types, subprocesses, multi-instance | [Node types](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/types/node.ts), [node builder](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/builders/node.builder.ts) | [Complex fixtures](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/complex-fixtures.test.ts) |
+| Multi-pool collaboration, messages, shared data store | [Converter](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/converter/BpmnConverter.ts), [Accounts Payable fixture](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/fixtures/models/accounts-payable.ts) | [Accounts Payable test](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/accounts-payable.test.ts) |
+| Diagram layout and orthogonal routing | [Layout](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/elk.layout.ts), [edge router](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/utils/edge-router.ts) | [Routing cases](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/routing-cases.test.ts), [layout tests](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/advanced-order-layout.test.ts) |
+| DI colors | [Color input type](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/types/di-color.ts) | [Color tests](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/di-color.test.ts) |
+| XML parsing for all exported fixtures | [Fixture index](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/fixtures/models/index.ts) | [Round-trip tests](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/roundtrip.test.ts) |
+| Model structure and reference checks | [Converter validation](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/src/converter/BpmnConverter.ts) | [Converter tests](https://github.com/ehisamed/json-to-bpmn-xml/blob/main/tests/BpmnConverter.test.ts) |
+
+Run `npm test` for these checks and `npm run build` to build the published JavaScript and TypeScript declarations.
 
 ## API
 

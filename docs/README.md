@@ -6,6 +6,7 @@ Index of project docs and local tooling.
 | --- | -------- | -------- |
 | [json-schema.en.md](./json-schema.en.md) | English | `ProcessModel` JSON: fields, nesting, rules, validation, examples |
 | [json-schema.ru.md](./json-schema.ru.md) | Русский | То же: структура JSON, правила, связи, типы, примеры |
+| [accounts-payable.md](./accounts-payable.md) | English | Complete collaboration example: JSON input, generated BPMN XML, diagram, reproduction and test evidence |
 
 Package overview, API, and quick start: [../README.md](../README.md).
 
