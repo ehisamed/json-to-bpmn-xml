@@ -217,6 +217,17 @@ signals?: { id: string; name?: string }[];
 
 Use `messageRef` on message events or `sendTask`/`receiveTask`; use `signalRef` on signal event definitions. Unknown references are rejected before XML generation.
 
+### `errors` / `escalations`
+
+Reusable definitions are declared at the model level:
+
+```ts
+errors?: { id: string; name?: string; errorCode?: string }[];
+escalations?: { id: string; name?: string; escalationCode?: string }[];
+```
+
+Use `eventDefinitionOptions.errorRef` or `eventDefinitionOptions.escalationRef` on the corresponding event. The referenced code is emitted on the root BPMN definition and unknown references are rejected.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -490,7 +501,7 @@ type INode = {
   laneId?: string;
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
-  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string };
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string };
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
