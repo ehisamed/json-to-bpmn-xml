@@ -67,6 +67,8 @@ export interface INode {
     linkDirection?: "source" | "target";
     messageRef?: string;
     signalRef?: string;
+    errorRef?: string;
+    escalationRef?: string;
   };
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */

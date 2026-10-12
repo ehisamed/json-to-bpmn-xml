@@ -217,6 +217,17 @@ signals?: { id: string; name?: string }[];
 
 `messageRef` используется у message-событий и задач `sendTask`/`receiveTask`, а `signalRef` — у signal-событий. Неизвестные ссылки отклоняются до генерации XML.
 
+### `errors` / `escalations`
+
+Переиспользуемые определения задаются на уровне модели:
+
+```ts
+errors?: { id: string; name?: string; errorCode?: string }[];
+escalations?: { id: string; name?: string; escalationCode?: string }[];
+```
+
+Для соответствующего события используются `eventDefinitionOptions.errorRef` и `eventDefinitionOptions.escalationRef`. Коды записываются в корневые BPMN-объекты, неизвестные ссылки отклоняются.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -490,7 +501,7 @@ type INode = {
   laneId?: string;
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
-  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string };
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string };
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };

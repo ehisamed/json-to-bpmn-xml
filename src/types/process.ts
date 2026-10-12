@@ -7,6 +7,8 @@ import { IDataObject } from "./data-object";
 import { ITextAnnotation, IGroup, IAssociation } from "./artifact";
 import { IMessage } from "./message";
 import { ISignal } from "./signal";
+import { IBpmnError } from "./error";
+import { IBpmnEscalation } from "./escalation";
 
 /** One process (pool participant) inside a collaboration. */
 export interface IProcessDef {
@@ -47,6 +49,12 @@ export interface ProcessModel {
 
   /** Reusable signal definitions referenced by signal event definitions. */
   signals?: ISignal[];
+
+  /** Reusable error definitions referenced by error events. */
+  errors?: IBpmnError[];
+
+  /** Reusable escalation definitions referenced by escalation events. */
+  escalations?: IBpmnEscalation[];
 
   /** Shared data store references. */
   dataStores?: IDataStore[];

@@ -135,4 +135,38 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/unknown signal/);
   });
+
+  it("throws on unknown error or escalation references", async () => {
+    await expect(
+      convert({
+        id: "bad-error-ref",
+        errors: [],
+        nodes: [
+          {
+            id: "start",
+            type: "start",
+            eventDefinition: "error",
+            eventDefinitionOptions: { errorRef: "missing" },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/unknown error/);
+
+    await expect(
+      convert({
+        id: "bad-escalation-ref",
+        escalations: [],
+        nodes: [
+          {
+            id: "start",
+            type: "start",
+            eventDefinition: "escalation",
+            eventDefinitionOptions: { escalationRef: "missing" },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/unknown escalation/);
+  });
 });

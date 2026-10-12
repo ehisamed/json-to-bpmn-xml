@@ -26,6 +26,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Node types**: start/end, task variants, expanded/event/transaction subprocesses, standard gateways, intermediate catch/throw and boundary events
 - **Event definitions**: timer, message, signal, conditional, error, escalation, terminate, cancel, compensation, link, and multiple definitions on one event
 - **Reusable Message/Signal definitions**: named `messages[]` and `signals[]` with `messageRef`/`signalRef` on events and send/receive tasks
+- **Reusable Error/Escalation definitions**: named `errors[]` and `escalations[]` with error/escalation codes and event references
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -281,6 +282,33 @@ Define messages and signals once at the model level, then reference them from ev
   edges: [
     { source: "Start", target: "Send" },
     { source: "Send", target: "Wait" },
+  ],
+}
+```
+
+### Reusable error and escalation references
+
+Define error and escalation codes once, then reference them from boundary or throw/catch events:
+
+```typescript
+{
+  id: "PaymentProcess",
+  errors: [{ id: "PaymentDeclined", name: "Payment declined", errorCode: "PAYMENT_DECLINED" }],
+  escalations: [{ id: "ManagerApproval", name: "Manager approval", escalationCode: "MANAGER_APPROVAL_REQUIRED" }],
+  nodes: [
+    {
+      id: "ChargeError",
+      type: "boundaryEvent",
+      attachedTo: "ChargeCard",
+      eventDefinition: "error",
+      eventDefinitionOptions: { errorRef: "PaymentDeclined" },
+    },
+    {
+      id: "Escalate",
+      type: "intermediateThrow",
+      eventDefinition: "escalation",
+      eventDefinitionOptions: { escalationRef: "ManagerApproval" },
+    },
   ],
 }
 ```
@@ -589,6 +617,7 @@ npm run build
 | `gatewayYesNoCross` | `gateway-yes-no-cross.ts` | Yes right / No bottom on diamond |
 | `gatewayJoinBypassTop` | `gateway-join-bypass-top.ts` | Bypass over top into join |
 | `messageSignalReferences` | `message-signal-references.ts` | Reusable Message/Signal definitions and references |
+| `errorEscalationReferences` | `error-escalation-references.ts` | Reusable Error/Escalation definitions and codes |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 

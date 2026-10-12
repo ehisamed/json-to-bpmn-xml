@@ -5,6 +5,8 @@ import type { IDataObject } from "../types/data-object";
 import type { ITextAnnotation, IGroup, IAssociation } from "../types/artifact";
 import type { IMessage } from "../types/message";
 import type { ISignal } from "../types/signal";
+import type { IBpmnError } from "../types/error";
+import type { IBpmnEscalation } from "../types/escalation";
 
 export type NormalizedModel = {
   id: string;
@@ -13,6 +15,8 @@ export type NormalizedModel = {
   messageFlows: IMessageFlow[];
   messages: IMessage[];
   signals: ISignal[];
+  errors: IBpmnError[];
+  escalations: IBpmnEscalation[];
   dataStores: IDataStore[];
   dataObjects: IDataObject[];
   textAnnotations: ITextAnnotation[];
@@ -32,6 +36,8 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
       messageFlows: model.messageFlows ?? [],
       messages: model.messages ?? [],
       signals: model.signals ?? [],
+      errors: model.errors ?? [],
+      escalations: model.escalations ?? [],
       dataStores: model.dataStores ?? [],
       dataObjects: model.dataObjects ?? [],
       textAnnotations: model.textAnnotations ?? [],
@@ -62,6 +68,8 @@ export function normalizeModel(model: ProcessModel): NormalizedModel {
     messageFlows: model.messageFlows ?? [],
     messages: model.messages ?? [],
     signals: model.signals ?? [],
+    errors: model.errors ?? [],
+    escalations: model.escalations ?? [],
     dataStores: model.dataStores ?? [],
     dataObjects: model.dataObjects ?? [],
     textAnnotations: model.textAnnotations ?? [],

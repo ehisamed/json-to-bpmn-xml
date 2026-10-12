@@ -71,6 +71,38 @@ export class BpmnConverter {
       );
     }
 
+    const errorById = new Map<string, any>();
+    for (const error of normalized.errors) {
+      if (errorById.has(error.id)) {
+        throw new Error(`Duplicate error id "${error.id}"`);
+      }
+      errorById.set(
+        error.id,
+        this.moddle.create("bpmn:Error", {
+          id: error.id,
+          ...(error.name !== undefined ? { name: error.name } : {}),
+          ...(error.errorCode !== undefined ? { errorCode: error.errorCode } : {}),
+        }),
+      );
+    }
+
+    const escalationById = new Map<string, any>();
+    for (const escalation of normalized.escalations) {
+      if (escalationById.has(escalation.id)) {
+        throw new Error(`Duplicate escalation id "${escalation.id}"`);
+      }
+      escalationById.set(
+        escalation.id,
+        this.moddle.create("bpmn:Escalation", {
+          id: escalation.id,
+          ...(escalation.name !== undefined ? { name: escalation.name } : {}),
+          ...(escalation.escalationCode !== undefined
+            ? { escalationCode: escalation.escalationCode }
+            : {}),
+        }),
+      );
+    }
+
     for (const store of normalized.dataStores) {
       const attrs: Record<string, unknown> = { id: store.id };
       if (store.name !== undefined) attrs.name = store.name;
@@ -142,6 +174,8 @@ export class BpmnConverter {
         built.elementById,
         messageById,
         signalById,
+        errorById,
+        escalationById,
       );
       for (const node of processDef.nodes) {
         if (node.color) colorsById.set(node.id, node.color);
@@ -319,8 +353,21 @@ export class BpmnConverter {
     }
 
     const rootElements = collaboration
-      ? [collaboration, ...bpmnProcesses, ...messageById.values(), ...signalById.values()]
-      : [...bpmnProcesses, ...messageById.values(), ...signalById.values()];
+      ? [
+          collaboration,
+          ...bpmnProcesses,
+          ...messageById.values(),
+          ...signalById.values(),
+          ...errorById.values(),
+          ...escalationById.values(),
+        ]
+      : [
+          ...bpmnProcesses,
+          ...messageById.values(),
+          ...signalById.values(),
+          ...errorById.values(),
+          ...escalationById.values(),
+        ];
 
     const definitions = this.definitionsBuilder.build(
       normalized.id,
@@ -522,6 +569,8 @@ export class BpmnConverter {
     elementById: Map<string, FlowNode>,
     messageById: Map<string, any>,
     signalById: Map<string, any>,
+    errorById?: Map<string, any>,
+    escalationById?: Map<string, any>,
   ) {
     for (const node of nodes) {
       const element = elementById.get(node.id) as any;
@@ -560,6 +609,36 @@ export class BpmnConverter {
         }
       }
 
+      const errorRef = node.eventDefinitionOptions?.errorRef;
+      if (errorRef !== undefined) {
+        const error = errorById?.get(errorRef);
+        if (!error) {
+          throw new Error(
+            `Node "${node.id}" references unknown error "${errorRef}"`,
+          );
+        }
+        for (const definition of element.eventDefinitions ?? []) {
+          if (definition.$type === "bpmn:ErrorEventDefinition") {
+            definition.errorRef = error;
+          }
+        }
+      }
+
+      const escalationRef = node.eventDefinitionOptions?.escalationRef;
+      if (escalationRef !== undefined) {
+        const escalation = escalationById?.get(escalationRef);
+        if (!escalation) {
+          throw new Error(
+            `Node "${node.id}" references unknown escalation "${escalationRef}"`,
+          );
+        }
+        for (const definition of element.eventDefinitions ?? []) {
+          if (definition.$type === "bpmn:EscalationEventDefinition") {
+            definition.escalationRef = escalation;
+          }
+        }
+      }
+
       if (node.type === "subProcess" && node.subProcess) {
         const nested = this.buildFlowElements(
           node.subProcess.nodes,
@@ -570,6 +649,8 @@ export class BpmnConverter {
           nested.elementById,
           messageById,
           signalById,
+          errorById,
+          escalationById,
         );
       }
     }

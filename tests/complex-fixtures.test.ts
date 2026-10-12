@@ -28,6 +28,7 @@ import {
   compensation,
   linkEvents,
   messageSignalReferences,
+  errorEscalationReferences,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -63,6 +64,7 @@ const layoutFixtures = [
   { name: "compensation", model: compensation },
   { name: "linkEvents", model: linkEvents },
   { name: "messageSignalReferences", model: messageSignalReferences },
+  { name: "errorEscalationReferences", model: errorEscalationReferences },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -91,6 +93,18 @@ describe("complex fixtures", () => {
     expect(xml).toContain('messageRef="Message_OrderSubmitted"');
     expect(xml).toContain('messageRef="Message_OrderAccepted"');
     expect(xml).toContain('signalRef="Signal_OrderApproved"');
+  });
+
+  it("emits reusable error and escalation references with codes", async () => {
+    const xml = await convert(errorEscalationReferences);
+    expect(xml).toContain(
+      '<bpmn:error id="Error_PaymentDeclined" name="Payment declined" errorCode="PAYMENT_DECLINED"/>',
+    );
+    expect(xml).toContain(
+      '<bpmn:escalation id="Escalation_ManagerApproval" name="Manager approval required" escalationCode="MANAGER_APPROVAL_REQUIRED"/>',
+    );
+    expect(xml).toContain('errorRef="Error_PaymentDeclined"');
+    expect(xml).toContain('escalationRef="Escalation_ManagerApproval"');
   });
 
   it("incidentResponse uses timer start on ops", async () => {

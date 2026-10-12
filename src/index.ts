@@ -11,6 +11,8 @@ import type { ILane } from "./types/lane";
 import type { IMessageFlow } from "./types/message-flow";
 import type { IMessage } from "./types/message";
 import type { ISignal } from "./types/signal";
+import type { IBpmnError } from "./types/error";
+import type { IBpmnEscalation } from "./types/escalation";
 import type { IDataStore } from "./types/data-store";
 import type { IDataObject } from "./types/data-object";
 import type { ITextAnnotation, IGroup, IAssociation } from "./types/artifact";
@@ -31,6 +33,8 @@ export type {
   IMessageFlow,
   IMessage,
   ISignal,
+  IBpmnError,
+  IBpmnEscalation,
   IDataStore,
   IDataObject,
   ITextAnnotation,
