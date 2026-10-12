@@ -32,6 +32,7 @@ import {
   timerParameters,
   multipleEventParameters,
   boundarySemantics,
+  compensationCancelSemantics,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -71,6 +72,7 @@ const layoutFixtures = [
   { name: "timerParameters", model: timerParameters },
   { name: "multipleEventParameters", model: multipleEventParameters },
   { name: "boundarySemantics", model: boundarySemantics },
+  { name: "compensationCancelSemantics", model: compensationCancelSemantics },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -309,6 +311,14 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:compensateEventDefinition id="Compensate_compensationDef" waitForCompletion="false"');
     expect(xml).toContain('activityRef="UndoCharge"');
     expect(xml).toContain('attachedToRef="ChargeCard"');
+  });
+
+  it("emits transaction cancel and compensation semantics", async () => {
+    const xml = await convert(compensationCancelSemantics);
+    expect(xml).toContain('<bpmn:cancelEventDefinition');
+    expect(xml).toContain('isForCompensation="true"');
+    expect(xml).toContain('activityRef="UndoReserve"');
+    expect(xml).toContain('attachedToRef="Transaction"');
   });
 
   it("connects link event definitions by name", async () => {

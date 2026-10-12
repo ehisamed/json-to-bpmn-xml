@@ -285,4 +285,33 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/must attach to an activity/);
   });
+
+  it("validates compensation handlers and cancel boundary targets", async () => {
+    await expect(
+      convert({
+        id: "compensation-handler-flow",
+        nodes: [
+          { id: "Task", type: "serviceTask", isForCompensation: true },
+          { id: "Start", type: "start" },
+        ],
+        edges: [{ source: "Start", target: "Task" }],
+      }),
+    ).rejects.toThrow(/cannot have normal sequence flows/);
+
+    await expect(
+      convert({
+        id: "cancel-boundary-target",
+        nodes: [
+          { id: "Task", type: "serviceTask" },
+          {
+            id: "Cancel",
+            type: "boundaryEvent",
+            attachedTo: "Task",
+            eventDefinition: "cancel",
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must attach to a transaction subprocess/);
+  });
 });

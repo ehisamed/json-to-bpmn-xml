@@ -40,3 +40,4 @@ export { errorEscalationReferences } from "./error-escalation-references";
 export { timerParameters } from "./timer-parameters";
 export { multipleEventParameters } from "./multiple-event-parameters";
 export { boundarySemantics } from "./boundary-semantics";
+export { compensationCancelSemantics } from "./compensation-cancel-semantics";

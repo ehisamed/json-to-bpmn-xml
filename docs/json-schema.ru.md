@@ -252,6 +252,8 @@ eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOp
 
 Для boundary event поле `cancelActivity?: boolean` задаёт прерывающий или непрерывающий режим (по умолчанию `true`). Boundary event должен быть привязан к activity, иметь ровно одну поддерживаемую event definition и не может иметь входящие sequence flow.
 
+Компенсирующий handler помечается `isForCompensation: true` и не должен участвовать в обычных sequence flow. Boundary compensation event обязан иметь `activityRef` на такой handler. Cancel boundary event должен быть привязан к transaction subprocess.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -528,6 +530,7 @@ type INode = {
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   cancelActivity?: boolean;
+  isForCompensation?: boolean;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };

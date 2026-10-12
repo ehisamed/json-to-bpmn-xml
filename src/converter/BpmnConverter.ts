@@ -812,6 +812,11 @@ export class BpmnConverter {
         processDef.edges,
         `Process "${processDef.id}"`,
       );
+      this.validateCompensationSemantics(
+        processDef.nodes,
+        processDef.edges,
+        `Process "${processDef.id}"`,
+      );
 
       for (const edge of processDef.edges) {
         if (!nodeIds.has(edge.source)) {
@@ -925,6 +930,7 @@ export class BpmnConverter {
 
     this.validateEventSubProcesses(nodes, edges, scope);
     this.validateBoundaryEvents(nodes, edges, scope);
+    this.validateCompensationSemantics(nodes, edges, scope);
   }
 
   private validateBoundaryEvents(
@@ -980,6 +986,90 @@ export class BpmnConverter {
       if (edges.some((edge) => edge.target === node.id)) {
         throw new Error(
           `Boundary event "${node.id}" cannot have incoming sequence flows`,
+        );
+      }
+    }
+  }
+
+  private validateCompensationSemantics(
+    nodes: INode[],
+    edges: IEdge[],
+    scope: string,
+  ) {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const activityTypes = new Set([
+      "task",
+      "manualTask",
+      "userTask",
+      "serviceTask",
+      "sendTask",
+      "receiveTask",
+      "scriptTask",
+      "businessRuleTask",
+      "callActivity",
+      "subProcess",
+    ]);
+
+    for (const node of nodes) {
+      if (node.isForCompensation) {
+        if (!activityTypes.has(node.type)) {
+          throw new Error(
+            `Node "${node.id}" marked isForCompensation must be an activity`,
+          );
+        }
+        if (edges.some((edge) => edge.source === node.id || edge.target === node.id)) {
+          throw new Error(
+            `Compensation handler "${node.id}" in ${scope} cannot have normal sequence flows`,
+          );
+        }
+      }
+
+      const definitions = node.eventDefinitions?.length
+        ? node.eventDefinitions
+        : node.eventDefinition
+          ? [node.eventDefinition]
+          : [];
+      if (!definitions.includes("compensation")) continue;
+
+      const options =
+        node.eventDefinitionOptionsByType?.compensation ??
+        node.eventDefinitionOptions;
+      const activityRef = options?.activityRef;
+      if (node.type === "boundaryEvent" && !activityRef) {
+        throw new Error(
+          `Boundary compensation event "${node.id}" requires activityRef`,
+        );
+      }
+      if (!activityRef) continue;
+
+      const activity = nodeById.get(activityRef);
+      if (!activity) {
+        throw new Error(
+          `Compensation event "${node.id}" references unknown activity "${activityRef}"`,
+        );
+      }
+      if (!activity.isForCompensation) {
+        throw new Error(
+          `Compensation activityRef "${activityRef}" must target an activity marked isForCompensation`,
+        );
+      }
+    }
+
+    for (const node of nodes) {
+      if (node.type !== "boundaryEvent") continue;
+      const definitions = node.eventDefinitions?.length
+        ? node.eventDefinitions
+        : node.eventDefinition
+          ? [node.eventDefinition]
+          : [];
+      if (!definitions.includes("cancel")) continue;
+      const attached = node.attachedTo ? nodeById.get(node.attachedTo) : undefined;
+      if (
+        attached?.type !== "subProcess" ||
+        attached.subProcess?.subProcessType !== "transaction"
+      ) {
+        throw new Error(
+          `Cancel boundary event "${node.id}" must attach to a transaction subprocess`,
         );
       }
     }

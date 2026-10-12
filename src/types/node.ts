@@ -92,6 +92,9 @@ export interface INode {
   /** Whether a boundary event interrupts its attached activity. Defaults to true. */
   cancelActivity?: boolean;
 
+  /** Marks an activity as a compensation handler outside the normal flow. */
+  isForCompensation?: boolean;
+
   /** Embedded subprocess body. Supported only when `type` is `subProcess`. */
   subProcess?: ISubProcessDef;
 

@@ -252,6 +252,8 @@ This allows timer, message, signal, error, escalation, and other definitions to 
 
 Boundary events use `cancelActivity?: boolean` (`true` by default) to select interrupting or non-interrupting behavior. A boundary event must attach to an activity, have exactly one supported event definition, and cannot have incoming sequence flows.
 
+Mark a compensation handler with `isForCompensation: true`. Compensation handlers cannot participate in normal sequence flow. A boundary compensation event must provide `activityRef` pointing to such a handler. A cancel boundary event must attach to a transaction subprocess.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -528,6 +530,7 @@ type INode = {
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   cancelActivity?: boolean;
+  isForCompensation?: boolean;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };

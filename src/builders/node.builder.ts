@@ -42,6 +42,10 @@ export class NodeBuilder {
       attrs.cancelActivity = node.cancelActivity;
     }
 
+    if (node.isForCompensation !== undefined) {
+      attrs.isForCompensation = node.isForCompensation;
+    }
+
     if (
       (node.type === "start" ||
         node.type === "end" ||

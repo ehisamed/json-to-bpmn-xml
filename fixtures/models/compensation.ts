@@ -7,7 +7,12 @@ export const compensation: ProcessModel = {
   nodes: [
     { id: "Start", type: "start", name: "Start" },
     { id: "ChargeCard", type: "serviceTask", name: "Charge card" },
-    { id: "UndoCharge", type: "serviceTask", name: "Undo card charge" },
+    {
+      id: "UndoCharge",
+      type: "serviceTask",
+      name: "Undo card charge",
+      isForCompensation: true,
+    },
     {
       id: "Compensate",
       type: "boundaryEvent",

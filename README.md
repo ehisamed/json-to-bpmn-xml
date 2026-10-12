@@ -30,6 +30,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Timer parameters**: `timeDate`, `timeDuration`, and repeating `timeCycle` expressions
 - **Multiple event parameters**: `eventDefinitionOptionsByType` keeps timer, message, signal, error, and escalation options independent
 - **Boundary event semantics**: `cancelActivity`, attachment validation, event-specific checks, and multiple boundary events per activity
+- **Compensation and cancel semantics**: `isForCompensation` handlers, activity references, transaction cancel boundaries, and rollback paths
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -655,6 +656,7 @@ npm run build
 | `timerParameters` | `timer-parameters.ts` | Timer date, duration, and repeating cycle |
 | `multipleEventParameters` | `multiple-event-parameters.ts` | Independent parameters for timer, message, and signal definitions |
 | `boundarySemantics` | `boundary-semantics.ts` | Multiple interrupting and non-interrupting boundary events |
+| `compensationCancelSemantics` | `compensation-cancel-semantics.ts` | Transaction cancel boundary and compensation handler |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 
