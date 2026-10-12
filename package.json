@@ -1,11 +1,13 @@
 {
   "name": "json-to-bpmn-xml",
-  "version": "2.1.1",
-  "description": "Convert JSON workflow definitions into BPMN 2.0 XML",
+  "version": "2.1.2",
+  "description": "Convert JSON workflows to BPMN 2.0 XML with automatic diagram layout, swimlanes, multi-pool collaborations and TypeScript types",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "assets"
   ],
   "scripts": {
     "build": "tsup",
@@ -21,7 +23,8 @@
     "example:service": "npx tsx examples/service-task.ts",
     "example:payable": "npx tsx examples/process-payable.ts",
     "example:schedule": "npx tsx examples/schedule-payments.ts",
-    "example:accounts": "npx tsx examples/accounts-payable.ts"
+    "example:accounts": "npx tsx examples/accounts-payable.ts",
+    "docs:example": "npx tsx scripts/export-doc-example.ts"
   },
   "keywords": [
     "bpmn",
@@ -29,7 +32,16 @@
     "converter",
     "json",
     "workflow",
-    "lanes"
+    "lanes",
+    "bpmn-2.0",
+    "bpmn-xml",
+    "json-to-bpmn",
+    "bpmn-generator",
+    "process-modeling",
+    "business-process",
+    "swimlanes",
+    "auto-layout",
+    "typescript"
   ],
   "author": "Samedov Etibar",
   "license": "Apache-2.0",
@@ -37,6 +49,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ehisamed/json-to-bpmn-xml.git"
+  },
+  "homepage": "https://github.com/ehisamed/json-to-bpmn-xml#readme",
+  "bugs": {
+    "url": "https://github.com/ehisamed/json-to-bpmn-xml/issues"
   },
   "dependencies": {
     "bpmn-moddle": "^10.0.0",
