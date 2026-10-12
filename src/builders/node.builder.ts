@@ -73,6 +73,9 @@ export class NodeBuilder {
           ...(eventDefinition === "link" && node.eventDefinitionOptions?.linkName
             ? { name: node.eventDefinitionOptions.linkName }
             : {}),
+          ...(eventDefinition === "timer"
+            ? this.buildTimerDefinitionAttrs(node.eventDefinitionOptions)
+            : {}),
         }),
       );
     }
@@ -106,5 +109,33 @@ export class NodeBuilder {
     }
 
     return this.moddle.create(type, attrs);
+  }
+
+  private buildTimerDefinitionAttrs(options: INode["eventDefinitionOptions"]) {
+    if (!options) return {};
+
+    const values = [options.timeDate, options.timeDuration, options.timeCycle].filter(
+      (value): value is string => value !== undefined,
+    );
+    if (values.length > 1) {
+      throw new Error(
+        "A timer event may define only one of timeDate, timeDuration, or timeCycle",
+      );
+    }
+
+    const expression = (body: string | undefined) =>
+      body === undefined
+        ? undefined
+        : this.moddle.create("bpmn:FormalExpression", { body });
+    if (options.timeDate !== undefined) {
+      return { timeDate: expression(options.timeDate) };
+    }
+    if (options.timeDuration !== undefined) {
+      return { timeDuration: expression(options.timeDuration) };
+    }
+    if (options.timeCycle !== undefined) {
+      return { timeCycle: expression(options.timeCycle) };
+    }
+    return {};
   }
 }

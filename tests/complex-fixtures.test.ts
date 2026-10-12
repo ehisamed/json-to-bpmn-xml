@@ -29,6 +29,7 @@ import {
   linkEvents,
   messageSignalReferences,
   errorEscalationReferences,
+  timerParameters,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -65,6 +66,7 @@ const layoutFixtures = [
   { name: "linkEvents", model: linkEvents },
   { name: "messageSignalReferences", model: messageSignalReferences },
   { name: "errorEscalationReferences", model: errorEscalationReferences },
+  { name: "timerParameters", model: timerParameters },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -105,6 +107,19 @@ describe("complex fixtures", () => {
     );
     expect(xml).toContain('errorRef="Error_PaymentDeclined"');
     expect(xml).toContain('escalationRef="Escalation_ManagerApproval"');
+  });
+
+  it("emits timer date, duration, and cycle expressions", async () => {
+    const xml = await convert(timerParameters);
+    expect(xml).toContain(
+      '<bpmn:timeDate xsi:type="bpmn:tFormalExpression">2026-10-12T09:00:00Z</bpmn:timeDate>',
+    );
+    expect(xml).toContain(
+      '<bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT15M</bpmn:timeDuration>',
+    );
+    expect(xml).toContain(
+      '<bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT1H</bpmn:timeCycle>',
+    );
   });
 
   it("incidentResponse uses timer start on ops", async () => {
