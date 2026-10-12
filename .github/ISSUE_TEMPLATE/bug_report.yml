@@ -1,0 +1,138 @@
+name: Bug report
+description: Report a reproducible problem with conversion, diagram layout, imports or documentation.
+title: "[Bug]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search [existing issues](https://github.com/ehisamed/json-to-bpmn-xml/issues) before submitting.
+        You may write your report in English or Russian.
+
+        Include the smallest example that still reproduces the problem. Remove confidential information from models, logs and attachments.
+        Input reference: [English](https://github.com/ehisamed/json-to-bpmn-xml/blob/v2.1.2/docs/json-schema.en.md) · [Русский](https://github.com/ehisamed/json-to-bpmn-xml/blob/v2.1.2/docs/json-schema.ru.md).
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Problem category
+      description: Choose the closest match. Describe multiple affected areas in the report if needed.
+      options:
+        - Conversion error or input validation
+        - Incorrect BPMN XML or missing elements / references
+        - Diagram layout, labels or edge routing
+        - Package installation, ESM imports or TypeScript types
+        - Local example or fixture preview tooling
+        - Documentation or documented example
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version or repository commit
+      description: Use the installed version from npm ls json-to-bpmn-xml. For repository code, provide the commit SHA; for documentation, provide the tag or branch you read.
+      placeholder: "Installed package version, or commit SHA / documentation tag"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Describe the actual result. For diagram problems, name the affected node / flow IDs and describe overlaps, missing labels, wrong docks or unexpected positions.
+      placeholder: "Flow_retry crosses Task_approve in the CFO lane when I open the generated BPMN file."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Describe what should happen. If reporting an unsupported or missing element, link to the documented behavior you expected.
+      placeholder: "Flow_retry should route around Task_approve without crossing its shape."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Paste the complete smallest ProcessModel and the convert() or BpmnConverter call, or link to a public runnable reproduction.
+        Keep relevant IDs, lane assignments, nested subprocesses, message flows and data references. A screenshot alone cannot reproduce a conversion or routing problem.
+        For import / tooling problems, include the failing import or command and steps. For documentation problems, link the page / section and quote the problematic example instead of supplying JSON.
+      placeholder: |
+        Replace this sample with the smallest model that reproduces your problem:
+
+        ```javascript
+        import { convert } from "json-to-bpmn-xml";
+
+        const model = {
+          id: "Reproduction",
+          nodes: [
+            { id: "Start", type: "start" },
+            { id: "Task", type: "userTask", name: "Review" },
+            { id: "End", type: "end" }
+          ],
+          edges: [
+            { id: "Flow_1", source: "Start", target: "Task" },
+            { id: "Flow_2", source: "Task", target: "End" }
+          ]
+        };
+
+        console.log(await convert(model));
+        ```
+
+        Command / steps to reproduce:
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Runtime and environment
+      description: Include applicable versions. For imports / types, name the bundler or framework and relevant module settings. For PNG preview problems, include Chrome / Puppeteer details.
+      placeholder: |
+        Runtime: Node.js version, or browser name and version
+        Operating system:
+        Package manager and version:
+        TypeScript / bundler / framework (if applicable):
+        Chrome / Puppeteer (for npm run preview):
+
+  - type: input
+    id: viewer
+    attributes:
+      label: BPMN viewer / modeler
+      description: For layout or XML import problems, provide the tool and version or URL. Mention whether the result differs in another viewer, if you have checked.
+      placeholder: "Camunda Modeler <version>, bpmn-js <version>, or https://demo.bpmn.io"
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Error logs or generated BPMN XML
+      description: Paste relevant errors / parser warnings or XML in fenced code blocks, or attach the complete output. If a .bpmn attachment is rejected, attach it as .txt or in a .zip archive.
+      placeholder: |
+        ```text
+        Error message and stack trace, if conversion fails
+        ```
+
+        ```xml
+        Generated XML or the relevant fragment, if conversion succeeds
+        ```
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Diagram screenshots
+      description: For layout problems, attach the actual diagram and, if useful, an annotated expected result. Mark the affected nodes and flows. Drag images into this field.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Regression or additional context
+      description: If known, provide the last working version, a workaround, related issues or the name of a repository fixture that reproduces the problem. Leave blank if unknown.
