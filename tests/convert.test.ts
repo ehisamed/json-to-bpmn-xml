@@ -101,4 +101,38 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/unknown source/);
   });
+
+  it("throws on unknown message or signal references", async () => {
+    await expect(
+      convert({
+        id: "bad-message-ref",
+        messages: [],
+        nodes: [
+          {
+            id: "start",
+            type: "start",
+            eventDefinition: "message",
+            eventDefinitionOptions: { messageRef: "missing" },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/unknown message/);
+
+    await expect(
+      convert({
+        id: "bad-signal-ref",
+        signals: [],
+        nodes: [
+          {
+            id: "start",
+            type: "start",
+            eventDefinition: "signal",
+            eventDefinitionOptions: { signalRef: "missing" },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/unknown signal/);
+  });
 });

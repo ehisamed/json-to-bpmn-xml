@@ -43,6 +43,34 @@ export class BpmnConverter {
     const artifactById = new Map<string, any>();
     const colorsById = new Map<string, DiColor>();
 
+    const messageById = new Map<string, any>();
+    for (const message of normalized.messages) {
+      if (messageById.has(message.id)) {
+        throw new Error(`Duplicate message id "${message.id}"`);
+      }
+      messageById.set(
+        message.id,
+        this.moddle.create("bpmn:Message", {
+          id: message.id,
+          ...(message.name !== undefined ? { name: message.name } : {}),
+        }),
+      );
+    }
+
+    const signalById = new Map<string, any>();
+    for (const signal of normalized.signals) {
+      if (signalById.has(signal.id)) {
+        throw new Error(`Duplicate signal id "${signal.id}"`);
+      }
+      signalById.set(
+        signal.id,
+        this.moddle.create("bpmn:Signal", {
+          id: signal.id,
+          ...(signal.name !== undefined ? { name: signal.name } : {}),
+        }),
+      );
+    }
+
     for (const store of normalized.dataStores) {
       const attrs: Record<string, unknown> = { id: store.id };
       if (store.name !== undefined) attrs.name = store.name;
@@ -109,6 +137,12 @@ export class BpmnConverter {
     for (const processDef of normalized.processes) {
       const built = this.buildFlowElements(processDef.nodes, processDef.edges);
       const elements = built.elements;
+      this.resolveMessageAndSignalReferences(
+        processDef.nodes,
+        built.elementById,
+        messageById,
+        signalById,
+      );
       for (const node of processDef.nodes) {
         if (node.color) colorsById.set(node.id, node.color);
       }
@@ -285,8 +319,8 @@ export class BpmnConverter {
     }
 
     const rootElements = collaboration
-      ? [collaboration, ...bpmnProcesses]
-      : [...bpmnProcesses];
+      ? [collaboration, ...bpmnProcesses, ...messageById.values(), ...signalById.values()]
+      : [...bpmnProcesses, ...messageById.values(), ...signalById.values()];
 
     const definitions = this.definitionsBuilder.build(
       normalized.id,
@@ -481,6 +515,64 @@ export class BpmnConverter {
     );
 
     return { elements, elementById, flows };
+  }
+
+  private resolveMessageAndSignalReferences(
+    nodes: INode[],
+    elementById: Map<string, FlowNode>,
+    messageById: Map<string, any>,
+    signalById: Map<string, any>,
+  ) {
+    for (const node of nodes) {
+      const element = elementById.get(node.id) as any;
+      if (!element) continue;
+
+      const messageRef =
+        node.messageRef ?? node.eventDefinitionOptions?.messageRef;
+      if (messageRef !== undefined) {
+        const message = messageById.get(messageRef);
+        if (!message) {
+          throw new Error(
+            `Node "${node.id}" references unknown message "${messageRef}"`,
+          );
+        }
+        if (node.messageRef !== undefined) element.messageRef = message;
+        for (const definition of element.eventDefinitions ?? []) {
+          if (definition.$type === "bpmn:MessageEventDefinition") {
+            definition.messageRef = message;
+          }
+        }
+      }
+
+      const signalRef =
+        node.signalRef ?? node.eventDefinitionOptions?.signalRef;
+      if (signalRef !== undefined) {
+        const signal = signalById.get(signalRef);
+        if (!signal) {
+          throw new Error(
+            `Node "${node.id}" references unknown signal "${signalRef}"`,
+          );
+        }
+        for (const definition of element.eventDefinitions ?? []) {
+          if (definition.$type === "bpmn:SignalEventDefinition") {
+            definition.signalRef = signal;
+          }
+        }
+      }
+
+      if (node.type === "subProcess" && node.subProcess) {
+        const nested = this.buildFlowElements(
+          node.subProcess.nodes,
+          node.subProcess.edges,
+        );
+        this.resolveMessageAndSignalReferences(
+          node.subProcess.nodes,
+          nested.elementById,
+          messageById,
+          signalById,
+        );
+      }
+    }
   }
 
   private validate(model: ReturnType<typeof normalizeModel>) {

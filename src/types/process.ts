@@ -5,6 +5,8 @@ import { IMessageFlow } from "./message-flow";
 import { IDataStore } from "./data-store";
 import { IDataObject } from "./data-object";
 import { ITextAnnotation, IGroup, IAssociation } from "./artifact";
+import { IMessage } from "./message";
+import { ISignal } from "./signal";
 
 /** One process (pool participant) inside a collaboration. */
 export interface IProcessDef {
@@ -39,6 +41,12 @@ export interface ProcessModel {
 
   /** Message flows between elements in different processes. */
   messageFlows?: IMessageFlow[];
+
+  /** Reusable message definitions referenced by nodes and event definitions. */
+  messages?: IMessage[];
+
+  /** Reusable signal definitions referenced by signal event definitions. */
+  signals?: ISignal[];
 
   /** Shared data store references. */
   dataStores?: IDataStore[];
