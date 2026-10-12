@@ -30,6 +30,7 @@ import {
   messageSignalReferences,
   errorEscalationReferences,
   timerParameters,
+  multipleEventParameters,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -67,6 +68,7 @@ const layoutFixtures = [
   { name: "messageSignalReferences", model: messageSignalReferences },
   { name: "errorEscalationReferences", model: errorEscalationReferences },
   { name: "timerParameters", model: timerParameters },
+  { name: "multipleEventParameters", model: multipleEventParameters },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -120,6 +122,15 @@ describe("complex fixtures", () => {
     expect(xml).toContain(
       '<bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT1H</bpmn:timeCycle>',
     );
+  });
+
+  it("emits parameters for each event definition independently", async () => {
+    const xml = await convert(multipleEventParameters);
+    expect(xml).toContain(
+      '<bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT30M</bpmn:timeDuration>',
+    );
+    expect(xml).toContain('messageRef="Message_InvoiceReceived"');
+    expect(xml).toContain('signalRef="Signal_InvoiceApproved"');
   });
 
   it("incidentResponse uses timer start on ops", async () => {

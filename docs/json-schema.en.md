@@ -242,6 +242,14 @@ eventDefinitionOptions?: {
 
 Values are emitted as `bpmn:FormalExpression` elements. Use ISO 8601 values such as `PT15M` or `R/PT1H` for durations and repeating cycles.
 
+For multiple definitions on one event, use a type-keyed options object:
+
+```ts
+eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
+```
+
+This allows timer, message, signal, error, escalation, and other definitions to carry independent parameters. The older `eventDefinitionOptions` remains the fallback for backward compatibility.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -516,6 +524,7 @@ type INode = {
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
+  eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };

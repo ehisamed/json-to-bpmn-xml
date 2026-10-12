@@ -481,30 +481,30 @@ export class BpmnConverter {
     );
 
     for (const node of nodes) {
-      const activityRef = node.eventDefinitionOptions?.activityRef;
-      if (!activityRef) continue;
       const source = elementById.get(node.id) as any;
-      const activity = elementById.get(activityRef);
-      if (!activity) {
-        throw new Error(
-          `Node "${node.id}" eventDefinition references unknown activity "${activityRef}"`,
-        );
-      }
       for (const definition of source?.eventDefinitions ?? []) {
-        if (definition.$type === "bpmn:CompensateEventDefinition") {
-          definition.activityRef = activity;
+        if (definition.$type !== "bpmn:CompensateEventDefinition") continue;
+        const options = this.optionsForDefinition(node, "compensation");
+        const activityRef = options?.activityRef;
+        if (!activityRef) continue;
+        const activity = elementById.get(activityRef);
+        if (!activity) {
+          throw new Error(
+            `Node "${node.id}" eventDefinition references unknown activity "${activityRef}"`,
+          );
         }
+          definition.activityRef = activity;
       }
     }
 
     const linkSources = new Map<string, any>();
     const linkTargets = new Map<string, any>();
     for (const node of nodes) {
-      const options = node.eventDefinitionOptions;
-      if (!options?.linkName) continue;
       const element = elementById.get(node.id) as any;
       for (const definition of element?.eventDefinitions ?? []) {
         if (definition.$type !== "bpmn:LinkEventDefinition") continue;
+        const options = this.optionsForDefinition(node, "link");
+        if (!options?.linkName) continue;
         const direction =
           options.linkDirection ??
           (node.type === "intermediateThrow" ? "source" : "target");
@@ -577,7 +577,7 @@ export class BpmnConverter {
       if (!element) continue;
 
       const messageRef =
-        node.messageRef ?? node.eventDefinitionOptions?.messageRef;
+        node.messageRef;
       if (messageRef !== undefined) {
         const message = messageById.get(messageRef);
         if (!message) {
@@ -586,56 +586,47 @@ export class BpmnConverter {
           );
         }
         if (node.messageRef !== undefined) element.messageRef = message;
-        for (const definition of element.eventDefinitions ?? []) {
-          if (definition.$type === "bpmn:MessageEventDefinition") {
-            definition.messageRef = message;
-          }
-        }
       }
 
-      const signalRef =
-        node.signalRef ?? node.eventDefinitionOptions?.signalRef;
-      if (signalRef !== undefined) {
-        const signal = signalById.get(signalRef);
-        if (!signal) {
-          throw new Error(
-            `Node "${node.id}" references unknown signal "${signalRef}"`,
-          );
-        }
-        for (const definition of element.eventDefinitions ?? []) {
-          if (definition.$type === "bpmn:SignalEventDefinition") {
-            definition.signalRef = signal;
+      for (const definition of element.eventDefinitions ?? []) {
+        const eventType = this.eventDefinitionType(definition.$type);
+        if (!eventType) continue;
+        const options = this.optionsForDefinition(node, eventType);
+        if (eventType === "message" && options?.messageRef !== undefined) {
+          const message = messageById.get(options.messageRef);
+          if (!message) {
+            throw new Error(
+              `Node "${node.id}" references unknown message "${options.messageRef}"`,
+            );
           }
+          definition.messageRef = message;
         }
-      }
-
-      const errorRef = node.eventDefinitionOptions?.errorRef;
-      if (errorRef !== undefined) {
-        const error = errorById?.get(errorRef);
-        if (!error) {
-          throw new Error(
-            `Node "${node.id}" references unknown error "${errorRef}"`,
-          );
-        }
-        for (const definition of element.eventDefinitions ?? []) {
-          if (definition.$type === "bpmn:ErrorEventDefinition") {
-            definition.errorRef = error;
+        if (eventType === "signal" && options?.signalRef !== undefined) {
+          const signal = signalById.get(options.signalRef);
+          if (!signal) {
+            throw new Error(
+              `Node "${node.id}" references unknown signal "${options.signalRef}"`,
+            );
           }
+          definition.signalRef = signal;
         }
-      }
-
-      const escalationRef = node.eventDefinitionOptions?.escalationRef;
-      if (escalationRef !== undefined) {
-        const escalation = escalationById?.get(escalationRef);
-        if (!escalation) {
-          throw new Error(
-            `Node "${node.id}" references unknown escalation "${escalationRef}"`,
-          );
-        }
-        for (const definition of element.eventDefinitions ?? []) {
-          if (definition.$type === "bpmn:EscalationEventDefinition") {
-            definition.escalationRef = escalation;
+        if (eventType === "error" && options?.errorRef !== undefined) {
+          const error = errorById?.get(options.errorRef);
+          if (!error) {
+            throw new Error(
+              `Node "${node.id}" references unknown error "${options.errorRef}"`,
+            );
           }
+          definition.errorRef = error;
+        }
+        if (eventType === "escalation" && options?.escalationRef !== undefined) {
+          const escalation = escalationById?.get(options.escalationRef);
+          if (!escalation) {
+            throw new Error(
+              `Node "${node.id}" references unknown escalation "${options.escalationRef}"`,
+            );
+          }
+          definition.escalationRef = escalation;
         }
       }
 
@@ -654,6 +645,29 @@ export class BpmnConverter {
         );
       }
     }
+  }
+
+  private optionsForDefinition(
+    node: INode,
+    eventDefinition: import("../types/node").EventDefinition,
+  ) {
+    return (
+      node.eventDefinitionOptionsByType?.[eventDefinition] ??
+      node.eventDefinitionOptions
+    );
+  }
+
+  private eventDefinitionType(type: string) {
+    const types: Record<string, import("../types/node").EventDefinition> = {
+      "bpmn:TimerEventDefinition": "timer",
+      "bpmn:MessageEventDefinition": "message",
+      "bpmn:SignalEventDefinition": "signal",
+      "bpmn:ErrorEventDefinition": "error",
+      "bpmn:EscalationEventDefinition": "escalation",
+      "bpmn:CompensateEventDefinition": "compensation",
+      "bpmn:LinkEventDefinition": "link",
+    };
+    return types[type];
   }
 
   private validate(model: ReturnType<typeof normalizeModel>) {

@@ -63,21 +63,24 @@ export class NodeBuilder {
         : node.eventDefinition
           ? [node.eventDefinition]
           : [];
-      attrs.eventDefinitions = definitions.map((eventDefinition, index) =>
-        this.moddle.create(defTypeByEvent[eventDefinition], {
+      attrs.eventDefinitions = definitions.map((eventDefinition, index) => {
+        const options =
+          node.eventDefinitionOptionsByType?.[eventDefinition] ??
+          node.eventDefinitionOptions;
+        return this.moddle.create(defTypeByEvent[eventDefinition], {
           id: `${node.id}_${eventDefinition}Def${definitions.length > 1 ? `_${index + 1}` : ""}`,
           ...(eventDefinition === "compensation" &&
-          node.eventDefinitionOptions?.waitForCompletion !== undefined
-            ? { waitForCompletion: node.eventDefinitionOptions.waitForCompletion }
+          options?.waitForCompletion !== undefined
+            ? { waitForCompletion: options.waitForCompletion }
             : {}),
-          ...(eventDefinition === "link" && node.eventDefinitionOptions?.linkName
-            ? { name: node.eventDefinitionOptions.linkName }
+          ...(eventDefinition === "link" && options?.linkName
+            ? { name: options.linkName }
             : {}),
           ...(eventDefinition === "timer"
-            ? this.buildTimerDefinitionAttrs(node.eventDefinitionOptions)
+            ? this.buildTimerDefinitionAttrs(options)
             : {}),
-        }),
-      );
+        });
+      });
     }
 
     if (node.multiInstance !== undefined && node.multiInstance !== false) {
