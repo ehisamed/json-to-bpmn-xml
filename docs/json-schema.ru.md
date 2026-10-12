@@ -228,6 +228,20 @@ escalations?: { id: string; name?: string; escalationCode?: string }[];
 
 Для соответствующего события используются `eventDefinitionOptions.errorRef` и `eventDefinitionOptions.escalationRef`. Коды записываются в корневые BPMN-объекты, неизвестные ссылки отклоняются.
 
+### Параметры Timer Event
+
+Для timer-события можно указать только один из взаимно исключающих параметров:
+
+```ts
+eventDefinitionOptions?: {
+  timeDate?: string;
+  timeDuration?: string;
+  timeCycle?: string;
+};
+```
+
+Значения записываются как `bpmn:FormalExpression`. Для duration и повторяющегося цикла используются значения ISO 8601, например `PT15M` и `R/PT1H`.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -501,7 +515,7 @@ type INode = {
   laneId?: string;
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
-  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string };
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };

@@ -169,4 +169,24 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/unknown escalation/);
   });
+
+  it("rejects timer events with multiple timer parameters", async () => {
+    await expect(
+      convert({
+        id: "bad-timer-parameters",
+        nodes: [
+          {
+            id: "start",
+            type: "start",
+            eventDefinition: "timer",
+            eventDefinitionOptions: {
+              timeDate: "2026-10-12T09:00:00Z",
+              timeDuration: "PT15M",
+            },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/only one of timeDate, timeDuration, or timeCycle/);
+  });
 });

@@ -69,6 +69,12 @@ export interface INode {
     signalRef?: string;
     errorRef?: string;
     escalationRef?: string;
+    /** ISO date/time expression for a timer event. Mutually exclusive with the other timer values. */
+    timeDate?: string;
+    /** ISO 8601 duration expression for a timer event, for example `PT15M`. */
+    timeDuration?: string;
+    /** ISO 8601 repeating interval expression for a timer event, for example `R/PT1H`. */
+    timeCycle?: string;
   };
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */

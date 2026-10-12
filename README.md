@@ -27,6 +27,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Event definitions**: timer, message, signal, conditional, error, escalation, terminate, cancel, compensation, link, and multiple definitions on one event
 - **Reusable Message/Signal definitions**: named `messages[]` and `signals[]` with `messageRef`/`signalRef` on events and send/receive tasks
 - **Reusable Error/Escalation definitions**: named `errors[]` and `escalations[]` with error/escalation codes and event references
+- **Timer parameters**: `timeDate`, `timeDuration`, and repeating `timeCycle` expressions
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -312,6 +313,22 @@ Define error and escalation codes once, then reference them from boundary or thr
   ],
 }
 ```
+
+### Timer parameters
+
+Timer event definitions accept one BPMN timer expression at a time:
+
+```typescript
+{ id: "StartAtDate", type: "start", eventDefinition: "timer",
+  eventDefinitionOptions: { timeDate: "2026-10-12T09:00:00Z" } }
+{ id: "Wait", type: "intermediateCatch", eventDefinition: "timer",
+  eventDefinitionOptions: { timeDuration: "PT15M" } }
+{ id: "Retry", type: "boundaryEvent", attachedTo: "Charge",
+  eventDefinition: "timer",
+  eventDefinitionOptions: { timeCycle: "R/PT1H" } }
+```
+
+`timeDate`, `timeDuration`, and `timeCycle` are emitted as BPMN formal expressions and are mutually exclusive.
 
 ### Fixture coverage
 
@@ -618,6 +635,7 @@ npm run build
 | `gatewayJoinBypassTop` | `gateway-join-bypass-top.ts` | Bypass over top into join |
 | `messageSignalReferences` | `message-signal-references.ts` | Reusable Message/Signal definitions and references |
 | `errorEscalationReferences` | `error-escalation-references.ts` | Reusable Error/Escalation definitions and codes |
+| `timerParameters` | `timer-parameters.ts` | Timer date, duration, and repeating cycle |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 
