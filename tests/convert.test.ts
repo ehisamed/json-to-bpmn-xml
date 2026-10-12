@@ -189,4 +189,50 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/only one of timeDate, timeDuration, or timeCycle/);
   });
+
+  it("validates event subprocess structure", async () => {
+    const baseSubprocess = {
+      id: "Handler",
+      type: "subProcess" as const,
+      subProcess: {
+        subProcessType: "event" as const,
+        nodes: [
+          { id: "HandlerStart", type: "start" as const, eventDefinition: "error" as const },
+          { id: "HandlerEnd", type: "end" as const },
+        ],
+        edges: [{ source: "HandlerStart", target: "HandlerEnd" }],
+      },
+    };
+
+    await expect(
+      convert({
+        id: "event-subprocess-flow",
+        nodes: [
+          { id: "start", type: "start" },
+          baseSubprocess,
+          { id: "end", type: "end" },
+        ],
+        edges: [{ source: "start", target: "Handler" }],
+      }),
+    ).rejects.toThrow(/cannot have incoming or outgoing sequence flows/);
+
+    await expect(
+      convert({
+        id: "event-subprocess-start",
+        nodes: [
+          {
+            ...baseSubprocess,
+            subProcess: {
+              ...baseSubprocess.subProcess,
+              nodes: [
+                { id: "HandlerStart", type: "start" },
+                { id: "HandlerEnd", type: "end" },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must define an event definition/);
+  });
 });

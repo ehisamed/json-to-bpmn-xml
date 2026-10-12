@@ -195,7 +195,7 @@ const model: ProcessModel = {
 
 ### Transaction with an event subprocess
 
-Use `subProcessType: "transaction"` for an atomic operation and `subProcessType: "event"` for a recovery handler:
+Use `subProcessType: "transaction"` for an atomic operation and `subProcessType: "event"` for a recovery handler. Event subprocesses are detached handlers: they cannot have parent sequence flows and their start events must have event definitions. Set `interrupting: false` for a non-interrupting handler.
 
 ```typescript
 const transaction: INode = {

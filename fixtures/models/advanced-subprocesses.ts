@@ -31,6 +31,7 @@ export const advancedSubprocesses: ProcessModel = {
       subProcess: {
         subProcessType: "event",
         expanded: true,
+        interrupting: false,
         nodes: [
           {
             id: "RecoveryStart",
@@ -51,7 +52,6 @@ export const advancedSubprocesses: ProcessModel = {
   ],
   edges: [
     { id: "FlowStartTx", source: "Start", target: "FulfillTransaction" },
-    { id: "FlowTxRecovery", source: "FulfillTransaction", target: "RecoveryEvents" },
-    { id: "FlowRecoveryEnd", source: "RecoveryEvents", target: "End" },
+    { id: "FlowTxEnd", source: "FulfillTransaction", target: "End" },
   ],
 };

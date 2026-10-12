@@ -264,6 +264,9 @@ describe("layout case fixtures", () => {
     expect(xml).toContain('<bpmn:subProcess id="RecoveryEvents"');
     expect(xml).toContain('<bpmn:startEvent id="RecoveryStart"');
     expect(xml).toContain('<bpmn:errorEventDefinition');
+    expect(xml).toMatch(
+      /<bpmn:startEvent id="RecoveryStart"[^>]*isInterrupting="false"/,
+    );
     expect(xml).toContain('bpmnElement="FulfillTransaction" isExpanded="true"');
     expect(xml).toContain('bpmnElement="RecoveryEvents" isExpanded="true"');
   });

@@ -60,6 +60,8 @@ export interface ISubProcessDef {
   expanded?: boolean;
   /** BPMN subprocess specialization. `event` emits triggeredByEvent; `transaction` emits bpmn:Transaction. */
   subProcessType?: "event" | "transaction";
+  /** Whether event subprocess start events interrupt the enclosing process. Defaults to true. */
+  interrupting?: boolean;
 }
 
 export interface INode {

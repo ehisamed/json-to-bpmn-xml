@@ -71,7 +71,7 @@ ProcessModel
 - No raw BPMN XML fragments.
 - No `laneId` attribute on emitted flow nodes (lanes are only via `laneSet` / `flowNodeRef`).
 - Nested subprocess contents use `subProcess.nodes` / `subProcess.edges`; set `expanded: true` for expanded DI.
-- `subProcessType: "event"` emits an event subprocess; `subProcessType: "transaction"` emits a transaction subprocess.
+- `subProcessType: "event"` emits an event subprocess; `subProcessType: "transaction"` emits a transaction subprocess. Event subprocesses cannot have parent sequence flows, require event-defined start events, and support `interrupting?: boolean` (default `true`).
 
 ---
 
@@ -527,7 +527,7 @@ type INode = {
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   messageRef?: string;
   signalRef?: string;
-  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
+  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };
   multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
   dataOutputs?: string[];

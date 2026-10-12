@@ -550,6 +550,13 @@ export class BpmnConverter {
           node.subProcess.nodes,
           node.subProcess.edges,
         );
+        if (node.subProcess.subProcessType === "event") {
+          for (const nestedNode of node.subProcess.nodes) {
+            if (nestedNode.type !== "start") continue;
+            const start = nested.elementById.get(nestedNode.id) as any;
+            start.isInterrupting = node.subProcess.interrupting ?? true;
+          }
+        }
         (elementById.get(node.id) as any).flowElements = [
           ...nested.elements,
           ...nested.flows,
@@ -795,6 +802,12 @@ export class BpmnConverter {
         }
       }
 
+      this.validateEventSubProcesses(
+        processDef.nodes,
+        processDef.edges,
+        `Process "${processDef.id}"`,
+      );
+
       for (const edge of processDef.edges) {
         if (!nodeIds.has(edge.source)) {
           throw new Error(
@@ -902,6 +915,49 @@ export class BpmnConverter {
         throw new Error(
           `${scope} edge "${edge.id ?? `${edge.source}->${edge.target}`}" has unknown target "${edge.target}"`,
         );
+      }
+    }
+
+    this.validateEventSubProcesses(nodes, edges, scope);
+  }
+
+  private validateEventSubProcesses(
+    nodes: INode[],
+    edges: IEdge[],
+    scope: string,
+  ) {
+    for (const node of nodes) {
+      if (node.subProcess?.subProcessType !== "event") continue;
+
+      if (edges.some((edge) => edge.source === node.id || edge.target === node.id)) {
+        throw new Error(
+          `Event subprocess "${node.id}" in ${scope} cannot have incoming or outgoing sequence flows`,
+        );
+      }
+
+      const startEvents = node.subProcess.nodes.filter((child) => child.type === "start");
+      if (startEvents.length === 0) {
+        throw new Error(
+          `Event subprocess "${node.id}" in ${scope} must contain a start event`,
+        );
+      }
+
+      for (const start of startEvents) {
+        if (!start.eventDefinition && !start.eventDefinitions?.length) {
+          throw new Error(
+            `Event subprocess start event "${start.id}" must define an event definition`,
+          );
+        }
+        if (node.subProcess.edges.some((edge) => edge.target === start.id)) {
+          throw new Error(
+            `Event subprocess start event "${start.id}" cannot have incoming sequence flows`,
+          );
+        }
+        if (!node.subProcess.edges.some((edge) => edge.source === start.id)) {
+          throw new Error(
+            `Event subprocess start event "${start.id}" must have an outgoing sequence flow`,
+          );
+        }
       }
     }
   }

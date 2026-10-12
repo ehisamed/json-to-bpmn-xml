@@ -71,7 +71,7 @@ ProcessModel
 - Нет кусков сырого BPMN XML.
 - Атрибут `laneId` **не** попадает на flow-узлы в XML (только `laneSet` / `flowNodeRef`).
 - Содержимое subprocess задаётся через `subProcess.nodes` / `subProcess.edges`; для раскрытой DI-картинки укажите `expanded: true`.
-- `subProcessType: "event"` создаёт event subprocess, `subProcessType: "transaction"` — transaction subprocess.
+- `subProcessType: "event"` создаёт event subprocess, `subProcessType: "transaction"` — transaction subprocess. У event subprocess не должно быть sequence flow с родительским процессом, стартовые события обязаны иметь event definition, а `interrupting?: boolean` задаёт прерывающий режим (по умолчанию `true`).
 
 ---
 
@@ -527,7 +527,7 @@ type INode = {
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   messageRef?: string;
   signalRef?: string;
-  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
+  subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };
   multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
   dataOutputs?: string[];
