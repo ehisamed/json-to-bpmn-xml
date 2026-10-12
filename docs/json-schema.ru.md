@@ -250,6 +250,8 @@ eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOp
 
 Старое поле `eventDefinitionOptions` сохраняется как fallback для обратной совместимости.
 
+Для boundary event поле `cancelActivity?: boolean` задаёт прерывающий или непрерывающий режим (по умолчанию `true`). Boundary event должен быть привязан к activity, иметь ровно одну поддерживаемую event definition и не может иметь входящие sequence flow.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -525,6 +527,7 @@ type INode = {
   eventDefinitions?: EventDefinition[];
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
+  cancelActivity?: boolean;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };

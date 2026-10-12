@@ -89,6 +89,9 @@ export interface INode {
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
 
+  /** Whether a boundary event interrupts its attached activity. Defaults to true. */
+  cancelActivity?: boolean;
+
   /** Embedded subprocess body. Supported only when `type` is `subProcess`. */
   subProcess?: ISubProcessDef;
 

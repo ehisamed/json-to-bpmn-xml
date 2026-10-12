@@ -235,4 +235,54 @@ describe("convert()", () => {
       }),
     ).rejects.toThrow(/must define an event definition/);
   });
+
+  it("validates boundary event attachment and definitions", async () => {
+    const boundary = {
+      id: "Boundary",
+      type: "boundaryEvent" as const,
+      attachedTo: "Task",
+      eventDefinition: "timer" as const,
+    };
+
+    await expect(
+      convert({
+        id: "boundary-incoming",
+        nodes: [
+          { id: "Task", type: "userTask" },
+          boundary,
+          { id: "Start", type: "start" },
+        ],
+        edges: [{ source: "Start", target: "Boundary" }],
+      }),
+    ).rejects.toThrow(/cannot have incoming sequence flows/);
+
+    await expect(
+      convert({
+        id: "boundary-invalid-definition",
+        nodes: [
+          { id: "Task", type: "userTask" },
+          {
+            ...boundary,
+            eventDefinitions: ["timer", "message"],
+            eventDefinition: undefined,
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must define exactly one event definition/);
+
+    await expect(
+      convert({
+        id: "boundary-invalid-target",
+        nodes: [
+          { id: "Start", type: "start" },
+          {
+            ...boundary,
+            attachedTo: "Start",
+          },
+        ],
+        edges: [],
+      }),
+    ).rejects.toThrow(/must attach to an activity/);
+  });
 });

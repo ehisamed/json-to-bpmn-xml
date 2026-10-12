@@ -250,6 +250,8 @@ eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOp
 
 This allows timer, message, signal, error, escalation, and other definitions to carry independent parameters. The older `eventDefinitionOptions` remains the fallback for backward compatibility.
 
+Boundary events use `cancelActivity?: boolean` (`true` by default) to select interrupting or non-interrupting behavior. A boundary event must attach to an activity, have exactly one supported event definition, and cannot have incoming sequence flows.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -525,6 +527,7 @@ type INode = {
   eventDefinitions?: EventDefinition[];
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
   eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
+  cancelActivity?: boolean;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction"; interrupting?: boolean };

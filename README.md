@@ -29,6 +29,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Reusable Error/Escalation definitions**: named `errors[]` and `escalations[]` with error/escalation codes and event references
 - **Timer parameters**: `timeDate`, `timeDuration`, and repeating `timeCycle` expressions
 - **Multiple event parameters**: `eventDefinitionOptionsByType` keeps timer, message, signal, error, and escalation options independent
+- **Boundary event semantics**: `cancelActivity`, attachment validation, event-specific checks, and multiple boundary events per activity
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -653,6 +654,7 @@ npm run build
 | `errorEscalationReferences` | `error-escalation-references.ts` | Reusable Error/Escalation definitions and codes |
 | `timerParameters` | `timer-parameters.ts` | Timer date, duration, and repeating cycle |
 | `multipleEventParameters` | `multiple-event-parameters.ts` | Independent parameters for timer, message, and signal definitions |
+| `boundarySemantics` | `boundary-semantics.ts` | Multiple interrupting and non-interrupting boundary events |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 

@@ -807,6 +807,11 @@ export class BpmnConverter {
         processDef.edges,
         `Process "${processDef.id}"`,
       );
+      this.validateBoundaryEvents(
+        processDef.nodes,
+        processDef.edges,
+        `Process "${processDef.id}"`,
+      );
 
       for (const edge of processDef.edges) {
         if (!nodeIds.has(edge.source)) {
@@ -919,6 +924,65 @@ export class BpmnConverter {
     }
 
     this.validateEventSubProcesses(nodes, edges, scope);
+    this.validateBoundaryEvents(nodes, edges, scope);
+  }
+
+  private validateBoundaryEvents(
+    nodes: INode[],
+    edges: IEdge[],
+    scope: string,
+  ) {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const activityTypes = new Set([
+      "task",
+      "manualTask",
+      "userTask",
+      "serviceTask",
+      "sendTask",
+      "receiveTask",
+      "scriptTask",
+      "businessRuleTask",
+      "callActivity",
+      "subProcess",
+    ]);
+    const unsupportedBoundaryDefinitions = new Set(["link", "terminate"]);
+
+    for (const node of nodes) {
+      if (node.type !== "boundaryEvent") continue;
+
+      const attached = node.attachedTo ? nodeById.get(node.attachedTo) : undefined;
+      if (!attached) {
+        throw new Error(
+          `Boundary event "${node.id}" references unknown attachedTo "${node.attachedTo ?? ""}"`,
+        );
+      }
+      if (!activityTypes.has(attached.type)) {
+        throw new Error(
+          `Boundary event "${node.id}" must attach to an activity, not "${attached.type}"`,
+        );
+      }
+
+      const definitions = node.eventDefinitions?.length
+        ? node.eventDefinitions
+        : node.eventDefinition
+          ? [node.eventDefinition]
+          : [];
+      if (definitions.length !== 1) {
+        throw new Error(
+          `Boundary event "${node.id}" must define exactly one event definition`,
+        );
+      }
+      if (unsupportedBoundaryDefinitions.has(definitions[0]!)) {
+        throw new Error(
+          `Boundary event "${node.id}" does not support ${definitions[0]} event definitions`,
+        );
+      }
+      if (edges.some((edge) => edge.target === node.id)) {
+        throw new Error(
+          `Boundary event "${node.id}" cannot have incoming sequence flows`,
+        );
+      }
+    }
   }
 
   private validateEventSubProcesses(
