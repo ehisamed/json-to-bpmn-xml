@@ -5,6 +5,7 @@ import type {
   ISubProcessDef,
   NodeType,
   EventDefinition,
+  EventDefinitionOptions,
 } from "./types/node";
 import type { IEdge } from "./types/edge";
 import type { ILane } from "./types/lane";

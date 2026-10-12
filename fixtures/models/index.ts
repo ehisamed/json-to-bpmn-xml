@@ -38,3 +38,4 @@ export { linkEvents } from "./link-events";
 export { messageSignalReferences } from "./message-signal-references";
 export { errorEscalationReferences } from "./error-escalation-references";
 export { timerParameters } from "./timer-parameters";
+export { multipleEventParameters } from "./multiple-event-parameters";

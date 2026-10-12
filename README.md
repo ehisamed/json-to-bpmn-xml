@@ -28,6 +28,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Reusable Message/Signal definitions**: named `messages[]` and `signals[]` with `messageRef`/`signalRef` on events and send/receive tasks
 - **Reusable Error/Escalation definitions**: named `errors[]` and `escalations[]` with error/escalation codes and event references
 - **Timer parameters**: `timeDate`, `timeDuration`, and repeating `timeCycle` expressions
+- **Multiple event parameters**: `eventDefinitionOptionsByType` keeps timer, message, signal, error, and escalation options independent
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -329,6 +330,21 @@ Timer event definitions accept one BPMN timer expression at a time:
 ```
 
 `timeDate`, `timeDuration`, and `timeCycle` are emitted as BPMN formal expressions and are mutually exclusive.
+
+For an event with several definitions, use `eventDefinitionOptionsByType` so each definition receives its own parameters:
+
+```typescript
+{
+  id: "WaitForAny",
+  type: "intermediateCatch",
+  eventDefinitions: ["timer", "message", "signal"],
+  eventDefinitionOptionsByType: {
+    timer: { timeDuration: "PT30M" },
+    message: { messageRef: "InvoiceReceived" },
+    signal: { signalRef: "InvoiceApproved" },
+  },
+}
+```
 
 ### Fixture coverage
 
@@ -636,6 +652,7 @@ npm run build
 | `messageSignalReferences` | `message-signal-references.ts` | Reusable Message/Signal definitions and references |
 | `errorEscalationReferences` | `error-escalation-references.ts` | Reusable Error/Escalation definitions and codes |
 | `timerParameters` | `timer-parameters.ts` | Timer date, duration, and repeating cycle |
+| `multipleEventParameters` | `multiple-event-parameters.ts` | Independent parameters for timer, message, and signal definitions |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 

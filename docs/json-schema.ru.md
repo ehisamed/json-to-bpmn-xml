@@ -242,6 +242,14 @@ eventDefinitionOptions?: {
 
 Значения записываются как `bpmn:FormalExpression`. Для duration и повторяющегося цикла используются значения ISO 8601, например `PT15M` и `R/PT1H`.
 
+Если у одного события несколько definitions, используйте объект `eventDefinitionOptionsByType`, чтобы задать отдельные параметры для каждого типа:
+
+```ts
+eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
+```
+
+Старое поле `eventDefinitionOptions` сохраняется как fallback для обратной совместимости.
+
 ### Artifacts
 
 - `textAnnotations[]`: `{ id, text, color? }`.
@@ -516,6 +524,7 @@ type INode = {
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
   eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string; errorRef?: string; escalationRef?: string; timeDate?: string; timeDuration?: string; timeCycle?: string };
+  eventDefinitionOptionsByType?: Partial<Record<EventDefinition, EventDefinitionOptions>>;
   messageRef?: string;
   signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };

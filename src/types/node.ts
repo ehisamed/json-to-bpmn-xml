@@ -36,6 +36,23 @@ export type EventDefinition =
   | "compensation"
   | "link";
 
+export interface EventDefinitionOptions {
+  activityRef?: string;
+  waitForCompletion?: boolean;
+  linkName?: string;
+  linkDirection?: "source" | "target";
+  messageRef?: string;
+  signalRef?: string;
+  errorRef?: string;
+  escalationRef?: string;
+  /** ISO date/time expression for a timer event. */
+  timeDate?: string;
+  /** ISO 8601 duration expression for a timer event. */
+  timeDuration?: string;
+  /** ISO 8601 repeating interval expression for a timer event. */
+  timeCycle?: string;
+}
+
 export interface ISubProcessDef {
   nodes: INode[];
   edges: IEdge[];
@@ -60,22 +77,12 @@ export interface INode {
   eventDefinitions?: EventDefinition[];
 
   /** Optional parameters for an event definition, currently used by compensation. */
-  eventDefinitionOptions?: {
-    activityRef?: string;
-    waitForCompletion?: boolean;
-    linkName?: string;
-    linkDirection?: "source" | "target";
-    messageRef?: string;
-    signalRef?: string;
-    errorRef?: string;
-    escalationRef?: string;
-    /** ISO date/time expression for a timer event. Mutually exclusive with the other timer values. */
-    timeDate?: string;
-    /** ISO 8601 duration expression for a timer event, for example `PT15M`. */
-    timeDuration?: string;
-    /** ISO 8601 repeating interval expression for a timer event, for example `R/PT1H`. */
-    timeCycle?: string;
-  };
+  eventDefinitionOptions?: EventDefinitionOptions;
+
+  /** Parameters keyed by event definition for multi-definition events. */
+  eventDefinitionOptionsByType?: Partial<
+    Record<EventDefinition, EventDefinitionOptions>
+  >;
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
   attachedTo?: string;
