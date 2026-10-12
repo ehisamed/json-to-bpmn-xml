@@ -9,7 +9,7 @@ Use it to generate BPMN diagrams from application data, export workflow configur
 
 The output includes both process elements and diagram coordinates for viewing in tools such as [bpmn.io](https://demo.bpmn.io) and Camunda Modeler. The library combines BPMN serialization through `bpmn-moddle` with ELK layout and custom orthogonal routing, including swimlanes, multiple pools, message flows and data associations.
 
-**Scope:** generates diagrams, not workflow execution. Processes are emitted with `isExecutable="false"`; deployment to an engine requires engine-specific configuration. Input validation checks model structure and references, and repository tests parse the output with `bpmn-moddle`; these checks do not establish full BPMN semantic or XSD conformance. Event definitions describe event types; the current input API does not expose timer schedules or message correlation settings.
+**Scope:** generates diagrams, not workflow execution. Processes are emitted with `isExecutable="false"`; deployment to an engine requires engine-specific configuration. Input validation checks model structure and references, and repository tests parse the output with `bpmn-moddle`; these checks do not establish full BPMN semantic or XSD conformance. Event definitions support reusable message and signal references; runtime correlation and execution remain engine-specific.
 
 **JSON structure reference (full rules, nesting, types):**
 
@@ -25,6 +25,7 @@ The output includes both process elements and diagram coordinates for viewing in
 - **Pretty-printed XML** with declaration, namespaces, and `xsi:schemaLocation`
 - **Node types**: start/end, task variants, expanded/event/transaction subprocesses, standard gateways, intermediate catch/throw and boundary events
 - **Event definitions**: timer, message, signal, conditional, error, escalation, terminate, cancel, compensation, link, and multiple definitions on one event
+- **Reusable Message/Signal definitions**: named `messages[]` and `signals[]` with `messageRef`/`signalRef` on events and send/receive tasks
 - **Multi-instance** loops with sequential/parallel behavior, cardinality, completion conditions, and behavior
 - **Swimlanes** and **multi-pool collaborations** with message flows
 - **Data stores and data objects** + data input/output associations
@@ -250,6 +251,37 @@ An event can wait for more than one trigger. Link events use the same `linkName`
     linkName: "ReviewHandoff",
     linkDirection: "source",
   },
+}
+```
+
+### Reusable message and signal references
+
+Define messages and signals once at the model level, then reference them from event definitions or send/receive tasks:
+
+```typescript
+{
+  id: "OrderProcess",
+  messages: [{ id: "OrderSubmitted", name: "Order submitted" }],
+  signals: [{ id: "OrderApproved", name: "Order approved" }],
+  nodes: [
+    {
+      id: "Start",
+      type: "start",
+      eventDefinition: "message",
+      eventDefinitionOptions: { messageRef: "OrderSubmitted" },
+    },
+    { id: "Send", type: "sendTask", messageRef: "OrderSubmitted" },
+    {
+      id: "Wait",
+      type: "intermediateCatch",
+      eventDefinition: "signal",
+      eventDefinitionOptions: { signalRef: "OrderApproved" },
+    },
+  ],
+  edges: [
+    { source: "Start", target: "Send" },
+    { source: "Send", target: "Wait" },
+  ],
 }
 ```
 
@@ -556,6 +588,7 @@ npm run build
 | `gatewayMultiToSameEnd` | `gateway-multi-to-same-end.ts` | Rejected/Timeout → shared End |
 | `gatewayYesNoCross` | `gateway-yes-no-cross.ts` | Yes right / No bottom on diamond |
 | `gatewayJoinBypassTop` | `gateway-join-bypass-top.ts` | Bypass over top into join |
+| `messageSignalReferences` | `message-signal-references.ts` | Reusable Message/Signal definitions and references |
 
 Complex fixtures (`accountsPayable`, `incidentResponse`) share patterns: swimlanes, `eventBasedGateway` + timer/message catches, exclusive bypass, message flows, and a shared data store. Routing regressions above are covered by `tests/routing-cases.test.ts`.
 

@@ -9,6 +9,8 @@ import type {
 import type { IEdge } from "./types/edge";
 import type { ILane } from "./types/lane";
 import type { IMessageFlow } from "./types/message-flow";
+import type { IMessage } from "./types/message";
+import type { ISignal } from "./types/signal";
 import type { IDataStore } from "./types/data-store";
 import type { IDataObject } from "./types/data-object";
 import type { ITextAnnotation, IGroup, IAssociation } from "./types/artifact";
@@ -27,6 +29,8 @@ export type {
   IEdge,
   ILane,
   IMessageFlow,
+  IMessage,
+  ISignal,
   IDataStore,
   IDataObject,
   ITextAnnotation,

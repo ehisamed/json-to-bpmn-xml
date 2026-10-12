@@ -65,6 +65,8 @@ export interface INode {
     waitForCompletion?: boolean;
     linkName?: string;
     linkDirection?: "source" | "target";
+    messageRef?: string;
+    signalRef?: string;
   };
 
   /** Activity id that owns a `boundaryEvent`. Required for boundary events. */
@@ -78,6 +80,12 @@ export interface INode {
 
   /** BPMN implementation value for send/receive/service activities. */
   implementation?: string;
+
+  /** Reusable message definition id for send/receive tasks. */
+  messageRef?: string;
+
+  /** Reusable signal definition id for signal event definitions. */
+  signalRef?: string;
 
   /** Script body and language for `scriptTask`. */
   script?: string;

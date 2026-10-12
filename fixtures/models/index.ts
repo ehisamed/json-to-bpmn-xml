@@ -35,3 +35,4 @@ export { controlEvents } from "./control-events";
 export { complexGatewayLoops } from "./complex-gateway-loops";
 export { compensation } from "./compensation";
 export { linkEvents } from "./link-events";
+export { messageSignalReferences } from "./message-signal-references";

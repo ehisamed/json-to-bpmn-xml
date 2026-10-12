@@ -27,6 +27,7 @@ import {
   complexGatewayLoops,
   compensation,
   linkEvents,
+  messageSignalReferences,
 } from "../fixtures/models";
 import { describe, it, expect } from "vitest";
 
@@ -61,6 +62,7 @@ const layoutFixtures = [
   { name: "complexGatewayLoops", model: complexGatewayLoops },
   { name: "compensation", model: compensation },
   { name: "linkEvents", model: linkEvents },
+  { name: "messageSignalReferences", model: messageSignalReferences },
 ] as const;
 
 describe("complex fixtures", () => {
@@ -80,6 +82,15 @@ describe("complex fixtures", () => {
     expect(xml).toContain("<bpmn:messageFlow");
     expect(xml).toContain("<bpmn:eventBasedGateway");
     expect(xml).toContain("<bpmn:dataStoreReference");
+  });
+
+  it("emits reusable message and signal references", async () => {
+    const xml = await convert(messageSignalReferences);
+    expect(xml).toContain('<bpmn:message id="Message_OrderSubmitted" name="Order submitted"/>');
+    expect(xml).toContain('<bpmn:signal id="Signal_OrderApproved" name="Order approved"/>');
+    expect(xml).toContain('messageRef="Message_OrderSubmitted"');
+    expect(xml).toContain('messageRef="Message_OrderAccepted"');
+    expect(xml).toContain('signalRef="Signal_OrderApproved"');
   });
 
   it("incidentResponse uses timer start on ops", async () => {

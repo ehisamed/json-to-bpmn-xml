@@ -203,6 +203,19 @@ Meaningful on activity-like nodes (`task`, `userTask`, `serviceTask`, `subProces
 
 - Compensation: `{ activityRef: "UndoCharge", waitForCompletion: false }`.
 - Link: `{ linkName: "ReviewHandoff", linkDirection: "source" | "target" }`. A source and target with the same `linkName` are connected.
+- Message: `{ messageRef: "OrderSubmitted" }` resolves to a model-level `messages[]` entry.
+- Signal: `{ signalRef: "OrderApproved" }` resolves to a model-level `signals[]` entry.
+
+### `messages` / `signals`
+
+Reusable definitions are declared at the model level:
+
+```ts
+messages?: { id: string; name?: string }[];
+signals?: { id: string; name?: string }[];
+```
+
+Use `messageRef` on message events or `sendTask`/`receiveTask`; use `signalRef` on signal event definitions. Unknown references are rejected before XML generation.
 
 ### Artifacts
 
@@ -477,7 +490,9 @@ type INode = {
   laneId?: string;
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
-  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target" };
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string };
+  messageRef?: string;
+  signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
   multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];

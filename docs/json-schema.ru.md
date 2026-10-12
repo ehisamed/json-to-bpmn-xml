@@ -203,6 +203,19 @@ Collaboration создаётся, если верно хотя бы одно:
 
 - Compensation: `{ activityRef: "UndoCharge", waitForCompletion: false }`.
 - Link: `{ linkName: "ReviewHandoff", linkDirection: "source" | "target" }`. Source и target с одинаковым `linkName` связываются.
+- Message: `{ messageRef: "OrderSubmitted" }` ссылается на элемент в `messages[]` модели.
+- Signal: `{ signalRef: "OrderApproved" }` ссылается на элемент в `signals[]` модели.
+
+### `messages` / `signals`
+
+Переиспользуемые определения задаются на уровне модели:
+
+```ts
+messages?: { id: string; name?: string }[];
+signals?: { id: string; name?: string }[];
+```
+
+`messageRef` используется у message-событий и задач `sendTask`/`receiveTask`, а `signalRef` — у signal-событий. Неизвестные ссылки отклоняются до генерации XML.
 
 ### Artifacts
 
@@ -477,7 +490,9 @@ type INode = {
   laneId?: string;
   eventDefinition?: EventDefinition;
   eventDefinitions?: EventDefinition[];
-  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target" };
+  eventDefinitionOptions?: { activityRef?: string; waitForCompletion?: boolean; linkName?: string; linkDirection?: "source" | "target"; messageRef?: string; signalRef?: string };
+  messageRef?: string;
+  signalRef?: string;
   subProcess?: { nodes: INode[]; edges: IEdge[]; expanded?: boolean; subProcessType?: "event" | "transaction" };
   multiInstance?: boolean | { sequential?: boolean; loopCardinality?: string | number; completionCondition?: string; behavior?: "All" | "One" | "Complex" };
   dataInputs?: string[];
