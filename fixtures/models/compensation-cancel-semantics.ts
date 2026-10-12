@@ -32,17 +32,11 @@ export const compensationCancelSemantics: ProcessModel = {
               waitForCompletion: true,
             },
           },
-          { id: "CompensationEnd", type: "end" },
           { id: "TxEnd", type: "end" },
         ],
         edges: [
           { id: "TxFlowStart", source: "TxStart", target: "Reserve" },
           { id: "TxFlowEnd", source: "Reserve", target: "TxEnd" },
-          {
-            id: "CompensationFlowEnd",
-            source: "CompensateReserve",
-            target: "CompensationEnd",
-          },
         ],
       },
     },
