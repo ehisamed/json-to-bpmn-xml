@@ -584,6 +584,10 @@ npm run preview
 - [xml-formatter](https://github.com/chrisbottin/xml-formatter) — readable XML output
 - [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image) — fixture PNG previews (dev)
 
+## Reporting bugs
+
+Use the [bug report form](https://github.com/ehisamed/json-to-bpmn-xml/issues/new?template=bug_report.yml). Include the package version, actual and expected behavior, and a minimal `ProcessModel` with the conversion call or another runnable reproduction. For diagram problems, include the affected node / flow IDs, viewer version, generated BPMN XML and a screenshot when available. Reports may be written in English or Russian.
+
 ## License
 
 Use under the terms of the [Apache-2.0](https://opensource.org/license/Apache-2.0).
