@@ -37,4 +37,4 @@ Warnings have a `code`, human-readable `message`, and optional `elementId`. `dia
 
 Do not replace a user's original XML with `await convert(model)` unless they explicitly accept dropped BPMN content and a new diagram layout. Importing does not mutate the source string or any file.
 
-Run `npm run preview` to inspect both directions. The timestamped output contains separate `json-to-bpmn/` and `bpmn-to-json/` directories. Each XML fixture has its original source, imported JSON and warnings, plus regenerated XML/PNG when a supported model exists.
+Run `npm run preview` to inspect both directions. The timestamped output contains separate `json-to-bpmn/` and `bpmn-to-json/` directories. The latter imports all generated model XML under `from-models/` and hand-written XML fixtures under `from-xml/`. Each case has its original source, imported JSON and warnings, plus regenerated XML/PNG when a supported model exists. `bpmn-to-json/coverage.md` lists the actual missing import coverage and related flow losses; `coverage.json` contains the machine-readable report.

@@ -15,7 +15,7 @@ Package overview, API, and quick start: [../README.md](../README.md).
 
 ## Fixture previews (PNG)
 
-Convert every model in `fixtures/models/` to BPMN XML and a PNG, and import every BPMN/XML file in `fixtures/xml/` to JSON. For imported models, generate a new BPMN XML and PNG to inspect the supported projection. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
+Convert every model in `fixtures/models/` to BPMN XML and a PNG, then import **every generated XML** back to JSON. Also import every BPMN/XML file in `fixtures/xml/`. Each import produces a JSON result and, when possible, a newly generated BPMN XML and PNG to inspect the supported projection. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
 
 ### Setup (once)
 
@@ -42,15 +42,25 @@ previews/YYYY-MM-DD_HH-mm-ss/
     accountsPayable.png
     …
   bpmn-to-json/
-    unsupported-ad-hoc.source.bpmn  # unchanged input
-    unsupported-ad-hoc.json         # { model, warnings }
-    unsupported-ad-hoc.bpmn         # regenerated supported subset
-    unsupported-ad-hoc.png          # preview of that subset
+    coverage.md                      # actual warnings and missing import coverage
+    coverage.json                    # machine-readable report
+    from-models/
+      accountsPayable.source.bpmn    # unchanged generated XML
+      accountsPayable.json           # { model, warnings }
+      accountsPayable.bpmn           # regenerated supported subset
+      accountsPayable.png
+      …
+    from-xml/
+      unsupported-ad-hoc.source.bpmn # unchanged hand-written fixture
+      unsupported-ad-hoc.json
+      unsupported-ad-hoc.bpmn
+      unsupported-ad-hoc.png
 ```
 
 - Folder name = date + time of the run
 - `previews/` is gitignored
 - If an XML fixture has no importable model, only its `.source.bpmn` and `.json` are written.
+- `coverage.md` groups unsupported BPMN elements separately from dependent dropped flows and informational DI-layout warnings. It is based on actual `importBpmn` warnings, not an exhaustive semantic diff.
 - Terminal shows colored step tree and a progress bar
 - PNG: white margin around the diagram; **no** fake black border (only BPMN pool/lane borders if present)
 

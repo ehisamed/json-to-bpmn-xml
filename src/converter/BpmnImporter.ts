@@ -305,6 +305,9 @@ export class BpmnImporter {
     if (element.$attrs && Object.keys(element.$attrs).length) {
       warn("unsupported", "Node vendor attributes are retained only in sourceXml", element.id);
     }
+    if (element.dataInputAssociations?.length || element.dataOutputAssociations?.length) {
+      warn("unsupported", "Activity data input/output associations are retained only in sourceXml", element.id);
+    }
     if (type === "boundaryEvent") {
       const attachedTo = refId(element.attachedToRef);
       if (!attachedTo) {

@@ -117,7 +117,7 @@ if (model) {
 }
 ```
 
-Unsupported nodes and sequence/message flows connected to them are omitted together; each omission is reported. If no process can be represented, or the partial JSON cannot be regenerated, `model` is `null` while `sourceXml` remains intact. Malformed XML rejects with a parse error. `npm run preview` checks both `fixtures/models/` and `fixtures/xml/`, writing separate `json-to-bpmn/` and `bpmn-to-json/` result folders. See [import guide](./docs/bpmn-import.md) and [unsupported-node fixture](./fixtures/xml/unsupported-ad-hoc.bpmn).
+Unsupported nodes and sequence/message flows connected to them are omitted together; each omission is reported. If no process can be represented, or the partial JSON cannot be regenerated, `model` is `null` while `sourceXml` remains intact. Malformed XML rejects with a parse error. `npm run preview` checks both `fixtures/models/` and `fixtures/xml/`, writing separate `json-to-bpmn/` and `bpmn-to-json/` result folders. It imports all generated XML back to JSON and writes `bpmn-to-json/coverage.md` with the observed warnings and missing features. See [import guide](./docs/bpmn-import.md) and [unsupported-node fixture](./fixtures/xml/unsupported-ad-hoc.bpmn).
 
 Without lanes, the diagram plane is bound to the **process** (no collaboration).
 
