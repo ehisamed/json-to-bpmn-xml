@@ -6,9 +6,8 @@
  *
  * Output:
  *   previews/YYYY-MM-DD_HH-mm-ss/json-to-bpmn/<fixture>.bpmn/.png
- *   previews/YYYY-MM-DD_HH-mm-ss/bpmn-to-json/from-models/<fixture>.source.bpmn/.json/.bpmn/.png
- *   previews/YYYY-MM-DD_HH-mm-ss/bpmn-to-json/from-xml/<fixture>.source.bpmn/.json/.bpmn/.png
- *   previews/YYYY-MM-DD_HH-mm-ss/bpmn-to-json/coverage.md/.json
+ *   previews/YYYY-MM-DD_HH-mm-ss/bpmn-to-json/<fixture>.bpmn/.json
+ *   previews/YYYY-MM-DD_HH-mm-ss/coverage.md/.json
  *
  * PNG framing (white background + padding) is applied after render —
  * conversion / layout logic is untouched.
@@ -313,37 +312,17 @@ async function renderXmlImport(
   outDir: string,
   index: number,
   total: number,
-  convertAll: typeof ConvertAll,
 ): Promise<ImportPreviewCase> {
   console.log();
   console.log(`  ${ansi.step("▶")} ${ansi.dim(`[${index + 1}/${total}]`)} ${ansi.name(name)} ${ansi.dim("BPMN → JSON")}`);
   const sourceXml = await readFile(sourcePath, "utf8");
   const result = await importBpmn(sourceXml);
-  const savedSourcePath = path.join(outDir, `${name}.source.bpmn`);
+  const savedSourcePath = path.join(outDir, `${name}.bpmn`);
   const jsonPath = path.join(outDir, `${name}.json`);
   await writeFile(savedSourcePath, result.sourceXml, "utf8");
   await writeFile(jsonPath, JSON.stringify({ model: result.model, warnings: result.warnings }, null, 2) + "\n", "utf8");
-  console.log(`    ${ansi.dim("├─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(savedSourcePath))} and ${ansi.path(path.basename(jsonPath))}`);
-  console.log(`    ${ansi.dim("├─")} ${ansi.step("warnings:")} ${result.warnings.length}`);
-  if (!result.model) {
-    console.log(`    ${ansi.dim("└─")} ${ansi.step("no supported JSON model; source preserved")}`);
-    return { source: `${origin === "model" ? "from-models" : "from-xml"}/${name}`, origin, importable: false, warnings: result.warnings };
-  }
-
-  const regeneratedXml = await convert(result.model);
-  const bpmnPath = path.join(outDir, `${name}.bpmn`);
-  const pngPath = path.join(outDir, `${name}.png`);
-  await writeFile(bpmnPath, regeneratedXml, "utf8");
-  console.log(`    ${ansi.dim("├─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(bpmnPath))}`);
-  console.log(`    ${ansi.dim("├─")} ${ansi.step("BPMN → PNG")} …`);
-  await withQuietConsole(() => convertAll([{ input: bpmnPath, outputs: [pngPath] }], {
-    footer: false,
-    title: false,
-    deviceScaleFactor: 2,
-  }));
-  await framePngOnWhiteCard(pngPath);
-  console.log(`    ${ansi.dim("└─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(pngPath))} ${ansi.dim(`(${await fileSize(pngPath)})`)}`);
-  return { source: `${origin === "model" ? "from-models" : "from-xml"}/${name}`, origin, importable: true, warnings: result.warnings };
+  console.log(`    ${ansi.dim("└─")} ${ansi.step("warnings:")} ${result.warnings.length}`);
+  return { source: name, origin, importable: !!result.model, warnings: result.warnings };
 }
 
 async function main() {
@@ -360,9 +339,15 @@ async function main() {
   const outDir = path.join(PREVIEWS_ROOT, stamp);
   const modelOutDir = path.join(outDir, "json-to-bpmn");
   const importOutDir = path.join(outDir, "bpmn-to-json");
-  const fromModelsOutDir = path.join(importOutDir, "from-models");
-  const fromXmlOutDir = path.join(importOutDir, "from-xml");
   const total = fixtures.length * 2 + xmlFixtures.length;
+  const usedNames = new Set(fixtures.map((entry) => entry.name.toLowerCase()));
+  const xmlImportNames = xmlFixtures.map((file) => {
+    const base = path.basename(file, path.extname(file));
+    const name = usedNames.has(base.toLowerCase()) ? `xml-${base}` : base;
+    if (usedNames.has(name.toLowerCase())) throw new Error(`Duplicate import preview name: ${name}`);
+    usedNames.add(name.toLowerCase());
+    return name;
+  });
 
   console.log();
   console.log(ansi.title(`  ╔${line("═")}╗`));
@@ -388,8 +373,7 @@ async function main() {
   }
 
   await mkdir(modelOutDir, { recursive: true });
-  await mkdir(fromModelsOutDir, { recursive: true });
-  await mkdir(fromXmlOutDir, { recursive: true });
+  await mkdir(importOutDir, { recursive: true });
 
   const started = Date.now();
   const ok: string[] = [];
@@ -416,8 +400,8 @@ async function main() {
     const name = fixtures[i]!.name;
     try {
       importCases.push(await renderXmlImport(
-        path.join(modelOutDir, `${name}.bpmn`), name, "model", fromModelsOutDir,
-        fixtures.length + i, total, convertAll,
+        path.join(modelOutDir, `${name}.bpmn`), name, "model", importOutDir,
+        fixtures.length + i, total,
       ));
       ok.push(`import:model:${name}`);
     } catch (err) {
@@ -430,11 +414,11 @@ async function main() {
 
   for (let i = 0; i < xmlFixtures.length; i++) {
     const file = xmlFixtures[i]!;
-    const name = path.basename(file, path.extname(file));
+    const name = xmlImportNames[i]!;
     try {
       importCases.push(await renderXmlImport(
-        path.join(XML_FIXTURES_ROOT, file), name, "xml", fromXmlOutDir,
-        fixtures.length * 2 + i, total, convertAll,
+        path.join(XML_FIXTURES_ROOT, file), name, "xml", importOutDir,
+        fixtures.length * 2 + i, total,
       ));
       ok.push(`import:xml:${file}`);
     } catch (err) {
@@ -446,9 +430,9 @@ async function main() {
   }
 
   const report = buildCoverageReport(importCases);
-  await writeFile(path.join(importOutDir, "coverage.json"), JSON.stringify(report, null, 2) + "\n", "utf8");
-  await writeFile(path.join(importOutDir, "coverage.md"), coverageMarkdown(report), "utf8");
-  console.log(`  ${ansi.dim("coverage:")} ${ansi.path(path.relative(ROOT, path.join(importOutDir, "coverage.md")))}`);
+  await writeFile(path.join(outDir, "coverage.json"), JSON.stringify(report, null, 2) + "\n", "utf8");
+  await writeFile(path.join(outDir, "coverage.md"), coverageMarkdown(report), "utf8");
+  console.log(`  ${ansi.dim("coverage:")} ${ansi.path(path.relative(ROOT, path.join(outDir, "coverage.md")))}`);
 
   const sec = ((Date.now() - started) / 1000).toFixed(1);
   console.log();

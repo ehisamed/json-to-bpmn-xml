@@ -15,11 +15,11 @@ describe("preview reverse-import coverage", () => {
     for (const [name, model] of Object.entries(fixtureExports)) {
       if (!isProcessModel(model)) continue;
       const result = await importBpmn(await convert(model));
-      cases.push({ source: `from-models/${name}`, origin: "model", importable: !!result.model, warnings: result.warnings });
+      cases.push({ source: name, origin: "model", importable: !!result.model, warnings: result.warnings });
     }
     const xml = await readFile(new URL("../fixtures/xml/unsupported-ad-hoc.bpmn", import.meta.url), "utf8");
     const result = await importBpmn(xml);
-    cases.push({ source: "from-xml/unsupported-ad-hoc", origin: "xml", importable: !!result.model, warnings: result.warnings });
+    cases.push({ source: "unsupported-ad-hoc", origin: "xml", importable: !!result.model, warnings: result.warnings });
 
     const report = buildCoverageReport(cases);
     expect(report.total).toBe(40);
@@ -29,9 +29,9 @@ describe("preview reverse-import coverage", () => {
       "Association", "AdHocSubProcess", "Empty/collapsed SubProcess", "Data input/output associations",
     ]));
     expect(report.gaps.some((group) => group.feature === "BPMNDI layout regenerated")).toBe(false);
-    expect(report.droppedFlows[0]?.feature).toBe("Dependent sequence/message flows");
-    expect(coverageMarkdown(report)).toContain("from-models/accountsPayable");
-    expect(coverageMarkdown(report)).toContain("from-xml/unsupported-ad-hoc");
+    expect(report.dependentLosses[0]?.feature).toBe("Dependent sequence/message flows");
+    expect(coverageMarkdown(report)).toContain("accountsPayable.bpmn | model");
+    expect(coverageMarkdown(report)).toContain("unsupported-ad-hoc.bpmn | XML fixture");
   });
 
   it("deduplicates repeated warnings for the same BPMN element", () => {

@@ -15,7 +15,7 @@ Package overview, API, and quick start: [../README.md](../README.md).
 
 ## Fixture previews (PNG)
 
-Convert every model in `fixtures/models/` to BPMN XML and a PNG, then import **every generated XML** back to JSON. Also import every BPMN/XML file in `fixtures/xml/`. Each import produces a JSON result and, when possible, a newly generated BPMN XML and PNG to inspect the supported projection. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
+Convert every model in `fixtures/models/` to BPMN XML and a PNG, then import **every generated XML** back to JSON. Also import every BPMN/XML file in `fixtures/xml/`. The reverse preview keeps simple pairs: unchanged source `.bpmn` and imported `.json` with warnings. `coverage.md` at the preview root aggregates those warnings. PNGs remain in the forward `json-to-bpmn/` folder. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
 
 ### Setup (once)
 
@@ -37,29 +37,24 @@ npm run preview
 
 ```
 previews/YYYY-MM-DD_HH-mm-ss/
+  coverage.md                        # missing reverse-import coverage
+  coverage.json                      # machine-readable report
   json-to-bpmn/
     accountsPayable.bpmn
     accountsPayable.png
     …
   bpmn-to-json/
-    coverage.md                      # actual warnings and missing import coverage
-    coverage.json                    # machine-readable report
-    from-models/
-      accountsPayable.source.bpmn    # unchanged generated XML
-      accountsPayable.json           # { model, warnings }
-      accountsPayable.bpmn           # regenerated supported subset
-      accountsPayable.png
-      …
-    from-xml/
-      unsupported-ad-hoc.source.bpmn # unchanged hand-written fixture
-      unsupported-ad-hoc.json
-      unsupported-ad-hoc.bpmn
-      unsupported-ad-hoc.png
+    accountsPayable.bpmn             # unchanged generated XML
+    accountsPayable.json             # { model, warnings }
+    …
+    unsupported-ad-hoc.bpmn          # unchanged hand-written XML fixture
+    unsupported-ad-hoc.json
 ```
 
 - Folder name = date + time of the run
 - `previews/` is gitignored
-- If an XML fixture has no importable model, only its `.source.bpmn` and `.json` are written.
+- An XML fixture without an importable model still gets its original `.bpmn` and a `.json` with `model: null` and warnings.
+- If a hand-written XML fixture has the same basename as a model fixture, its output name is prefixed with `xml-` to prevent overwriting.
 - `coverage.md` groups unsupported BPMN elements separately from dependent dropped flows and informational DI-layout warnings. It is based on actual `importBpmn` warnings, not an exhaustive semantic diff.
 - Terminal shows colored step tree and a progress bar
 - PNG: white margin around the diagram; **no** fake black border (only BPMN pool/lane borders if present)

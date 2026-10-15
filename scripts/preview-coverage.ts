@@ -19,7 +19,7 @@ export interface PreviewCoverageReport {
   importable: number;
   withGaps: number;
   gaps: CoverageGroup[];
-  droppedFlows: CoverageGroup[];
+  dependentLosses: CoverageGroup[];
   informational: CoverageGroup[];
   cases: ImportPreviewCase[];
 }
@@ -32,6 +32,7 @@ function featureName(warning: ImportWarning): string {
   if (warning.code === "conversion-failed") return "JSON regeneration failure";
   if (warning.code === "diagram-rebuilt") return "BPMNDI layout regenerated";
   if (warning.code === "dropped-flow") return "Dependent sequence/message flows";
+  if (warning.code === "missing-reference") return "Dependent elements with missing references";
   return warning.message;
 }
 
@@ -65,8 +66,8 @@ export function buildCoverageReport(cases: ImportPreviewCase[]): PreviewCoverage
     total: sorted.length,
     importable: sorted.filter((entry) => entry.importable).length,
     withGaps: sorted.filter((entry) => entry.warnings.some((warning) => warning.code !== "diagram-rebuilt")).length,
-    gaps: groupWarnings(sorted, (warning) => ["unsupported", "missing-reference", "conversion-failed", "parse"].includes(warning.code)),
-    droppedFlows: groupWarnings(sorted, (warning) => warning.code === "dropped-flow"),
+    gaps: groupWarnings(sorted, (warning) => ["unsupported", "conversion-failed", "parse"].includes(warning.code)),
+    dependentLosses: groupWarnings(sorted, (warning) => warning.code === "dropped-flow" || warning.code === "missing-reference"),
     informational: groupWarnings(sorted, (warning) => warning.code === "diagram-rebuilt"),
     cases: sorted,
   };
@@ -97,10 +98,10 @@ export function coverageMarkdown(report: PreviewCoverageReport): string {
     "## Не реализовано или не восстановлено в JSON",
     "",
     groupTable(report.gaps),
-    "## Потери связанных flow",
+    "## Потери связанных элементов и flow",
     "",
-    groupTable(report.droppedFlows),
-    "`dropped-flow` обычно является следствием пропуска узла; это не отдельный неподдерживаемый тип BPMN.",
+    groupTable(report.dependentLosses),
+    "`dropped-flow` и `missing-reference` обычно являются следствием пропуска узла; это не отдельные неподдерживаемые типы BPMN.",
     "",
     "## Информационные предупреждения",
     "",
@@ -109,11 +110,11 @@ export function coverageMarkdown(report: PreviewCoverageReport): string {
     "",
     "## По каждому XML",
     "",
-    "| Источник | JSON | Предупреждения, кроме DI |",
-    "| --- | --- | --- |",
+    "| BPMN-файл | Происхождение | JSON | Предупреждения, кроме DI |",
+    "| --- | --- | --- | --- |",
     ...report.cases.map((entry) => {
       const warnings = entry.warnings.filter((warning) => warning.code !== "diagram-rebuilt");
-      return `| ${escapeCell(entry.source)} | ${entry.importable ? "да" : "нет"} | ${warnings.length ? warnings.map((warning) => escapeCell(`${warning.code}${warning.elementId ? ` (${warning.elementId})` : ""}: ${warning.message}`)).join("<br>") : "—"} |`;
+      return `| ${escapeCell(entry.source)}.bpmn | ${entry.origin === "model" ? "model" : "XML fixture"} | ${entry.importable ? "да" : "нет"} | ${warnings.length ? warnings.map((warning) => escapeCell(`${warning.code}${warning.elementId ? ` (${warning.elementId})` : ""}: ${warning.message}`)).join("<br>") : "—"} |`;
     }),
     "",
     "Полные предупреждения и ID элементов доступны в `coverage.json` и в JSON каждого примера.",
