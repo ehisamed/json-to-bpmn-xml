@@ -7,6 +7,7 @@ Index of project docs and local tooling.
 | [json-schema.en.md](./json-schema.en.md) | English | `ProcessModel` JSON: fields, nesting, rules, validation, examples |
 | [json-schema.ru.md](./json-schema.ru.md) | Русский | То же: структура JSON, правила, связи, типы, примеры |
 | [accounts-payable.md](./accounts-payable.md) | English | Complete collaboration example: JSON input, generated BPMN XML, diagram, reproduction and test evidence |
+| [bpmn-import.md](./bpmn-import.md) | English | Safe BPMN XML import, partial JSON, warnings, and original XML preservation |
 
 Package overview, API, and quick start: [../README.md](../README.md).
 
@@ -14,7 +15,7 @@ Package overview, API, and quick start: [../README.md](../README.md).
 
 ## Fixture previews (PNG)
 
-Convert every model in `fixtures/models/` to BPMN XML and a PNG with white padding. Diagram conversion/layout is unchanged — padding is applied only to the image. No artificial border is added (pool/lane outlines come from BPMN itself).
+Convert every model in `fixtures/models/` to BPMN XML and a PNG, then import **every generated XML** back to JSON. Also import every BPMN/XML file in `fixtures/xml/`. The reverse preview keeps simple pairs: unchanged source `.bpmn` and imported `.json` with warnings. `coverage.md` at the preview root aggregates those warnings. PNGs remain in the forward `json-to-bpmn/` folder. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
 
 ### Setup (once)
 
@@ -36,15 +37,25 @@ npm run preview
 
 ```
 previews/YYYY-MM-DD_HH-mm-ss/
-  accountsPayable.bpmn
-  accountsPayable.png
-  advancedOrder.bpmn
-  advancedOrder.png
-  …
+  coverage.md                        # missing reverse-import coverage
+  coverage.json                      # machine-readable report
+  json-to-bpmn/
+    accountsPayable.bpmn
+    accountsPayable.png
+    …
+  bpmn-to-json/
+    accountsPayable.bpmn             # unchanged generated XML
+    accountsPayable.json             # { model, warnings }
+    …
+    unsupported-ad-hoc.bpmn          # unchanged hand-written XML fixture
+    unsupported-ad-hoc.json
 ```
 
 - Folder name = date + time of the run
 - `previews/` is gitignored
+- An XML fixture without an importable model still gets its original `.bpmn` and a `.json` with `model: null` and warnings.
+- If a hand-written XML fixture has the same basename as a model fixture, its output name is prefixed with `xml-` to prevent overwriting.
+- `coverage.md` groups unsupported BPMN elements separately from dependent dropped flows and informational DI-layout warnings. It is based on actual `importBpmn` warnings, not an exhaustive semantic diff.
 - Terminal shows colored step tree and a progress bar
 - PNG: white margin around the diagram; **no** fake black border (only BPMN pool/lane borders if present)
 

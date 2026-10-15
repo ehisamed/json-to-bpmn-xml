@@ -58,10 +58,16 @@ export interface ISubProcessDef {
   edges: IEdge[];
   /** Render the embedded body inside the subprocess shape when true. */
   expanded?: boolean;
-  /** BPMN subprocess specialization. `event` emits triggeredByEvent; `transaction` emits bpmn:Transaction. */
-  subProcessType?: "event" | "transaction";
+  /** BPMN subprocess specialization. */
+  subProcessType?: "event" | "transaction" | "adHoc";
   /** Whether event subprocess start events interrupt the enclosing process. Defaults to true. */
   interrupting?: boolean;
+  /** Ad-hoc execution ordering. BPMN defaults to parallel when omitted. */
+  ordering?: "Parallel" | "Sequential";
+  /** Whether unfinished ad-hoc activities are cancelled when completionCondition is met. */
+  cancelRemainingInstances?: boolean;
+  /** Formal expression that completes the ad-hoc subprocess. */
+  completionCondition?: string;
 }
 
 export interface INode {

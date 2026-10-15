@@ -9,6 +9,8 @@ export class NodeBuilder {
     const type =
       node.type === "subProcess" && node.subProcess?.subProcessType === "transaction"
         ? "bpmn:Transaction"
+        : node.type === "subProcess" && node.subProcess?.subProcessType === "adHoc"
+          ? "bpmn:AdHocSubProcess"
         : NODE_MAP[node.type];
     const attrs: Record<string, unknown> = {
       id: node.id,
@@ -20,6 +22,18 @@ export class NodeBuilder {
 
     if (node.type === "subProcess" && node.subProcess?.subProcessType === "event") {
       attrs.triggeredByEvent = true;
+    }
+
+    if (node.type === "subProcess" && node.subProcess?.subProcessType === "adHoc") {
+      if (node.subProcess.ordering !== undefined) attrs.ordering = node.subProcess.ordering;
+      if (node.subProcess.cancelRemainingInstances !== undefined) {
+        attrs.cancelRemainingInstances = node.subProcess.cancelRemainingInstances;
+      }
+      if (node.subProcess.completionCondition !== undefined) {
+        attrs.completionCondition = this.moddle.create("bpmn:FormalExpression", {
+          body: node.subProcess.completionCondition,
+        });
+      }
     }
 
     if (node.calledElement !== undefined) {

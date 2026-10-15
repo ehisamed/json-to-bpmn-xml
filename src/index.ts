@@ -1,4 +1,6 @@
 import { BpmnConverter } from "./converter/BpmnConverter";
+import { BpmnImporter } from "./converter/BpmnImporter";
+import type { ImportResult, ImportWarning } from "./converter/BpmnImporter";
 import type { ProcessModel, IProcessDef } from "./types/process";
 import type {
   INode,
@@ -24,8 +26,15 @@ export async function convert(model: ProcessModel): Promise<string> {
   return await converter.convert(model);
 }
 
-export { BpmnConverter };
+/** Parse BPMN XML into the supported JSON subset and report omitted BPMN content. */
+export async function importBpmn(xml: string): Promise<ImportResult> {
+  return new BpmnImporter().import(xml);
+}
+
+export { BpmnConverter, BpmnImporter };
 export type {
+  ImportResult,
+  ImportWarning,
   ProcessModel,
   IProcessDef,
   INode,

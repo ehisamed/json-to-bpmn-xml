@@ -785,8 +785,12 @@ export class BpmnConverter {
         }
 
         if (node.subProcess) {
-          if (!node.subProcess.nodes?.length) {
+          if (!node.subProcess.nodes?.length && node.subProcess.subProcessType !== "adHoc") {
             throw new Error(`SubProcess "${node.id}" must contain nodes`);
+          }
+          if (node.subProcess.subProcessType === "adHoc" && node.subProcess.ordering !== undefined &&
+              !["Parallel", "Sequential"].includes(node.subProcess.ordering)) {
+            throw new Error(`AdHocSubProcess "${node.id}" ordering must be Parallel or Sequential`);
           }
           if (!Array.isArray(node.subProcess.edges)) {
             throw new Error(`SubProcess "${node.id}" edges must be an array`);

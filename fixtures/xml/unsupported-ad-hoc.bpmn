@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Unsupported_Definitions" targetNamespace="http://example.com/import">
+  <bpmn:process id="Process_Unsupported" name="Partial import">
+    <bpmn:startEvent id="Start" />
+    <bpmn:adHocSubProcess id="AdHoc" name="Manual review" />
+    <bpmn:boundaryEvent id="Boundary" attachedToRef="AdHoc">
+      <bpmn:timerEventDefinition id="Timer" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End" />
+    <bpmn:sequenceFlow id="Flow_To_AdHoc" sourceRef="Start" targetRef="AdHoc" />
+    <bpmn:sequenceFlow id="Flow_From_AdHoc" sourceRef="AdHoc" targetRef="End" />
+    <bpmn:sequenceFlow id="Flow_From_Boundary" sourceRef="Boundary" targetRef="End" />
+    <bpmn:sequenceFlow id="Flow_Direct" sourceRef="Start" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>
