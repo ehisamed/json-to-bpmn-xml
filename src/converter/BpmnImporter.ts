@@ -40,6 +40,7 @@ const NODE_TYPES: Record<string, NodeType> = {
   "bpmn:CallActivity": "callActivity",
   "bpmn:SubProcess": "subProcess",
   "bpmn:Transaction": "subProcess",
+  "bpmn:AdHocSubProcess": "subProcess",
   "bpmn:ExclusiveGateway": "exclusiveGateway",
   "bpmn:InclusiveGateway": "inclusiveGateway",
   "bpmn:ParallelGateway": "parallelGateway",
@@ -471,8 +472,20 @@ export class BpmnImporter {
     if (type === "subProcess") {
       const nestedElements = (element.flowElements ?? []) as Element[];
       const nested = this.importFlowElements(nestedElements, warn, expandedById, dataKindById, false);
+      const isAdHoc = element.$type === "bpmn:AdHocSubProcess";
       if (!nested.nodes.length) {
         if (nestedElements.length) warn("unsupported", "Subprocess body has no supported nodes; only its outer node was imported", element.id);
+        if (isAdHoc) {
+          node.subProcess = {
+            nodes: [],
+            edges: [],
+            expanded: expandedById.get(element.id) ?? false,
+            subProcessType: "adHoc",
+            ...(element.ordering !== undefined ? { ordering: element.ordering } : {}),
+            ...(element.cancelRemainingInstances !== undefined ? { cancelRemainingInstances: element.cancelRemainingInstances === true } : {}),
+            ...(body(element.completionCondition) !== undefined ? { completionCondition: body(element.completionCondition)! } : {}),
+          };
+        }
         if (element.triggeredByEvent || element.$type === "bpmn:Transaction") {
           warn("unsupported", "Empty event/transaction subprocess specialization is retained only in sourceXml", element.id);
         }
@@ -483,6 +496,12 @@ export class BpmnImporter {
         edges: nested.edges,
         expanded: expandedById.get(element.id) ?? false,
         ...(element.$type === "bpmn:Transaction" ? { subProcessType: "transaction" as const } : {}),
+        ...(isAdHoc ? {
+          subProcessType: "adHoc" as const,
+          ...(element.ordering !== undefined ? { ordering: element.ordering } : {}),
+          ...(element.cancelRemainingInstances !== undefined ? { cancelRemainingInstances: element.cancelRemainingInstances === true } : {}),
+          ...(body(element.completionCondition) !== undefined ? { completionCondition: body(element.completionCondition)! } : {}),
+        } : {}),
         ...(element.triggeredByEvent ? { subProcessType: "event" as const } : {}),
       };
       if (element.triggeredByEvent) {

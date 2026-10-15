@@ -119,7 +119,7 @@ if (model) {
 
 Unsupported nodes and sequence/message flows connected to them are omitted together; each omission is reported. If no process can be represented, or the partial JSON cannot be regenerated, `model` is `null` while `sourceXml` remains intact. Malformed XML rejects with a parse error. `npm run preview` checks both `fixtures/models/` and `fixtures/xml/`, writing separate `json-to-bpmn/` and `bpmn-to-json/` result folders. It imports all generated XML back to JSON; the reverse folder contains flat `.bpmn`/`.json` pairs and root-level `coverage.md` lists observed warnings and missing features. See [import guide](./docs/bpmn-import.md) and [unsupported-node fixture](./fixtures/xml/unsupported-ad-hoc.bpmn).
 
-The reverse converter also restores simple data-store/data-object links, text annotations, groups, and associations from generated BPMN. Empty ordinary subprocesses remain connected to their sequence flows. BPMNDI geometry/colors, group metadata not serialized by the forward converter, and advanced data mappings still require the original `sourceXml`.
+The reverse converter also restores simple data-store/data-object links, text annotations, groups, associations, and ad-hoc subprocesses from generated BPMN. Ad-hoc settings are available through `subProcess.subProcessType: "adHoc"`, `ordering`, `cancelRemainingInstances`, and `completionCondition`; empty ordinary subprocesses remain connected to their sequence flows. BPMNDI geometry/colors, group metadata not serialized by the forward converter, and advanced data mappings still require the original `sourceXml`.
 
 Without lanes, the diagram plane is bound to the **process** (no collaboration).
 

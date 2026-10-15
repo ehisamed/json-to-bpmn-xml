@@ -17,21 +17,45 @@ const newDiagram = await convert(result.model);
 // Preserve result.sourceXml separately if you need the exact original.
 ```
 
-## Example: unsupported element
+## Example: ad-hoc subprocess
 
-[`fixtures/xml/unsupported-ad-hoc.bpmn`](../fixtures/xml/unsupported-ad-hoc.bpmn) has `Start → AdHocSubProcess → End` and a direct `Start → End` path. `AdHocSubProcess` is not in `ProcessModel`. The importer keeps `Start`, `End`, and their direct flow. It omits the ad-hoc subprocess, its attached boundary event, and three dependent flows. Warnings include their BPMN IDs. The original XML is still available as `sourceXml`.
+An ad-hoc subprocess is represented as a subprocess with a special subtype. Its inner activities are not required to have sequence flows because the execution order is selected at runtime.
+
+```ts
+const model = {
+  id: "IncidentReview",
+  nodes: [{
+    id: "Checklist",
+    type: "subProcess",
+    subProcess: {
+      subProcessType: "adHoc",
+      ordering: "Parallel",
+      cancelRemainingInstances: false,
+      completionCondition: "completedTasks >= 2",
+      nodes: [
+        { id: "CheckLogs", type: "task" },
+        { id: "ContactCustomer", type: "userTask" },
+      ],
+      edges: [],
+    },
+  }],
+  edges: [],
+};
+```
+
+The direct converter emits `bpmn:adHocSubProcess`; the reverse converter restores the subtype and settings. Connected outer sequence flows and boundary events are preserved.
 
 ```ts
 const { model, warnings, sourceXml } = await importBpmn(input);
-// model.nodes: Start, End
-// model.edges: Flow_Direct
-// warnings: unsupported AdHoc, missing-reference Boundary,
-//           dropped-flow Flow_To_AdHoc / Flow_From_AdHoc / Flow_From_Boundary
+// model.nodes: Start, AdHoc, Boundary, End
+// model.edges: Flow_To_AdHoc / Flow_From_AdHoc /
+//              Flow_From_Boundary / Flow_Direct
+// warnings: []
 ```
 
 ## What is imported
 
-Supported process nodes, sequence flows, basic event definitions and references, task properties, multi-instance loop settings, lanes, nested subprocesses (including empty ordinary subprocesses), collaboration participants and message flows, reusable message/signal/error/escalation definitions, top-level data-store/data-object references and simple activity input/output associations, text annotations, groups, and artifact associations. For example, `dataObjectInputs: ["InvoiceDocument"]` is restored from a single-source `DataInputAssociation`; `dataOutputs: ["InvoiceStore"]` is restored from a `DataOutputAssociation` targeting a data-store reference. See [`data-objects.ts`](../fixtures/models/data-objects.ts) and [`artifacts.ts`](../fixtures/models/artifacts.ts) for full generated examples.
+Supported process nodes, sequence flows, basic event definitions and references, task properties, multi-instance loop settings, lanes, nested subprocesses (including empty ordinary subprocesses and ad-hoc subprocesses), collaboration participants and message flows, reusable message/signal/error/escalation definitions, top-level data-store/data-object references and simple activity input/output associations, text annotations, groups, and artifact associations. Ad-hoc subprocesses use `subProcess.subProcessType: "adHoc"` with optional `ordering`, `cancelRemainingInstances`, and `completionCondition`. For example, `dataObjectInputs: ["InvoiceDocument"]` is restored from a single-source `DataInputAssociation`; `dataOutputs: ["InvoiceStore"]` is restored from a `DataOutputAssociation` targeting a data-store reference. See [`data-objects.ts`](../fixtures/models/data-objects.ts), [`artifacts.ts`](../fixtures/models/artifacts.ts), and [`ad-hoc-subprocess.ts`](../fixtures/models/ad-hoc-subprocess.ts) for full generated examples.
 
 Import is deliberately conservative: constructs outside this mapping are omitted or projected with warnings. A BPMN `Group` becomes `{ id }` because the generated XML currently does not carry the JSON `name` or `categoryValue`. Data association assignments, transformations, non-placeholder input targets, nested data references, group category references, arbitrary extension elements and vendor attributes remain only in `sourceXml`. BPMNDI coordinates and colors are not imported; `convert` recalculates layout. Re-export is therefore not a lossless round trip even when no structural warning appears.
 

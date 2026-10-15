@@ -22,12 +22,12 @@ describe("preview reverse-import coverage", () => {
     cases.push({ source: "unsupported-ad-hoc", origin: "xml", importable: !!result.model, warnings: result.warnings });
 
     const report = buildCoverageReport(cases);
-    expect(report.total).toBe(40);
-    expect(report.importable).toBe(40);
-    expect(report.gaps.map((group) => group.feature)).toEqual(["AdHocSubProcess"]);
-    expect(report.withGaps).toBe(1);
+    expect(report.total).toBe(41);
+    expect(report.importable).toBe(41);
+    expect(report.gaps).toEqual([]);
+    expect(report.withGaps).toBe(0);
     expect(report.gaps.some((group) => group.feature === "BPMNDI layout regenerated")).toBe(false);
-    expect(report.dependentLosses[0]?.feature).toBe("Dependent sequence/message flows");
+    expect(report.dependentLosses).toEqual([]);
     expect(coverageMarkdown(report)).toContain("accountsPayable.bpmn | model");
     expect(coverageMarkdown(report)).toContain("unsupported-ad-hoc.bpmn | XML fixture");
   });

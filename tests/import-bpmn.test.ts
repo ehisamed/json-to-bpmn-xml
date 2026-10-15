@@ -8,6 +8,7 @@ import { accountsPayable } from "../fixtures/models/accounts-payable";
 import { dataObjects } from "../fixtures/models/data-objects";
 import { artifacts } from "../fixtures/models/artifacts";
 import { subprocessAndMultiInstance } from "../fixtures/models/subprocess-and-multi-instance";
+import { adHocSubprocess } from "../fixtures/models/ad-hoc-subprocess";
 import type { ProcessModel } from "../src/types/process";
 
 function isProcessModel(value: unknown): value is ProcessModel {
@@ -34,26 +35,45 @@ describe("BPMN XML import", () => {
     await expect(importBpmn("<bpmn:definitions>")).rejects.toThrow();
   });
 
-  it("omits unsupported nodes, dependent boundaries and flows without changing the original XML", async () => {
+  it("imports ad-hoc subprocesses, boundaries and connected flows without changing the original XML", async () => {
     const xml = await readFile(new URL("../fixtures/xml/unsupported-ad-hoc.bpmn", import.meta.url), "utf8");
     const result = await importBpmn(xml);
     expect(result.sourceXml).toBe(xml);
-    expect(result.model?.nodes?.map((node) => node.id)).toEqual(["Start", "End"]);
-    expect(result.model?.edges?.map((edge) => edge.id)).toEqual(["Flow_Direct"]);
-    expect(result.warnings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "unsupported", elementId: "AdHoc" }),
-      expect.objectContaining({ code: "missing-reference", elementId: "Boundary" }),
-      expect.objectContaining({ code: "dropped-flow", elementId: "Flow_To_AdHoc" }),
-    ]));
+    expect(result.model?.nodes?.map((node) => node.id)).toEqual(["Start", "AdHoc", "Boundary", "End"]);
+    expect(result.model?.edges?.map((edge) => edge.id)).toEqual([
+      "Flow_To_AdHoc", "Flow_From_AdHoc", "Flow_From_Boundary", "Flow_Direct",
+    ]);
+    expect(result.model?.nodes?.find((node) => node.id === "AdHoc")?.subProcess).toMatchObject({
+      subProcessType: "adHoc",
+    });
+    expect(result.warnings.filter((warning) => warning.code !== "diagram-rebuilt")).toEqual([]);
     await expect(convert(result.model!)).resolves.toContain('id="Flow_Direct"');
   });
 
+  it("round-trips ad-hoc ordering and completion settings", async () => {
+    const xml = await convert(adHocSubprocess);
+    expect(xml).toContain("<bpmn:adHocSubProcess");
+    expect(xml).toContain('ordering="Parallel"');
+    expect(xml).toContain('cancelRemainingInstances="false"');
+    expect(xml).toContain("completedTasks &gt;= 2");
+    const result = await importBpmn(xml);
+    expect(result.warnings.filter((warning) => warning.code !== "diagram-rebuilt")).toEqual([]);
+    expect(result.model?.nodes?.find((node) => node.id === "ReviewChecklist")?.subProcess).toMatchObject({
+      subProcessType: "adHoc",
+      ordering: "Parallel",
+      cancelRemainingInstances: false,
+      completionCondition: "completedTasks >= 2",
+    });
+    expect(result.model?.nodes?.find((node) => node.id === "ReviewChecklist")?.subProcess?.nodes.map((node) => node.id))
+      .toEqual(["CheckLogs", "ContactCustomer", "CreateReport"]);
+  });
+
   it("returns null for a process containing only unsupported nodes", async () => {
-    const xml = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="OnlyUnsupported" targetNamespace="test"><bpmn:process id="Process"><bpmn:adHocSubProcess id="AdHoc" /></bpmn:process></bpmn:definitions>`;
+    const xml = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="OnlyUnsupported" targetNamespace="test"><bpmn:process id="Process"><bpmn:choreographyTask id="ChoreographyTask" /></bpmn:process></bpmn:definitions>`;
     const result = await importBpmn(xml);
     expect(result.model).toBeNull();
     expect(result.sourceXml).toBe(xml);
-    expect(result.warnings.some((warning) => warning.elementId === "AdHoc")).toBe(true);
+    expect(result.warnings.some((warning) => warning.elementId === "ChoreographyTask")).toBe(true);
   });
 
   it("restores collaboration references and message flows", async () => {
