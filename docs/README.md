@@ -7,6 +7,7 @@ Index of project docs and local tooling.
 | [json-schema.en.md](./json-schema.en.md) | English | `ProcessModel` JSON: fields, nesting, rules, validation, examples |
 | [json-schema.ru.md](./json-schema.ru.md) | Русский | То же: структура JSON, правила, связи, типы, примеры |
 | [accounts-payable.md](./accounts-payable.md) | English | Complete collaboration example: JSON input, generated BPMN XML, diagram, reproduction and test evidence |
+| [bpmn-import.md](./bpmn-import.md) | English | Safe BPMN XML import, partial JSON, warnings, and original XML preservation |
 
 Package overview, API, and quick start: [../README.md](../README.md).
 
@@ -14,7 +15,7 @@ Package overview, API, and quick start: [../README.md](../README.md).
 
 ## Fixture previews (PNG)
 
-Convert every model in `fixtures/models/` to BPMN XML and a PNG with white padding. Diagram conversion/layout is unchanged — padding is applied only to the image. No artificial border is added (pool/lane outlines come from BPMN itself).
+Convert every model in `fixtures/models/` to BPMN XML and a PNG, and import every BPMN/XML file in `fixtures/xml/` to JSON. For imported models, generate a new BPMN XML and PNG to inspect the supported projection. PNG framing adds white padding only; diagram layout is unchanged by the framing step.
 
 ### Setup (once)
 
@@ -36,15 +37,20 @@ npm run preview
 
 ```
 previews/YYYY-MM-DD_HH-mm-ss/
-  accountsPayable.bpmn
-  accountsPayable.png
-  advancedOrder.bpmn
-  advancedOrder.png
-  …
+  json-to-bpmn/
+    accountsPayable.bpmn
+    accountsPayable.png
+    …
+  bpmn-to-json/
+    unsupported-ad-hoc.source.bpmn  # unchanged input
+    unsupported-ad-hoc.json         # { model, warnings }
+    unsupported-ad-hoc.bpmn         # regenerated supported subset
+    unsupported-ad-hoc.png          # preview of that subset
 ```
 
 - Folder name = date + time of the run
 - `previews/` is gitignored
+- If an XML fixture has no importable model, only its `.source.bpmn` and `.json` are written.
 - Terminal shows colored step tree and a progress bar
 - PNG: white margin around the diagram; **no** fake black border (only BPMN pool/lane borders if present)
 

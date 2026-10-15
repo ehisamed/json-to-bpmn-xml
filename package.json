@@ -1,6 +1,6 @@
 {
   "name": "json-to-bpmn-xml",
-  "version": "2.8.1",
+  "version": "2.9.0",
   "description": "Convert JSON workflows to BPMN 2.0 XML with automatic diagram layout, swimlanes, multi-pool collaborations and TypeScript types",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

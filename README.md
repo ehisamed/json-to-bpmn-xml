@@ -22,6 +22,7 @@ The output includes both process elements and diagram coordinates for viewing in
 ## Features
 
 - **JSON → BPMN 2.0 XML** via [`bpmn-moddle`](https://github.com/bpmn-io/bpmn-moddle)
+- **BPMN XML → supported JSON subset** via `importBpmn(xml)`, with warnings and the unchanged source XML
 - **Pretty-printed XML** with declaration, namespaces, and `xsi:schemaLocation`
 - **Node types**: start/end, task variants, expanded/event/transaction subprocesses, standard gateways, intermediate catch/throw and boundary events
 - **Event definitions**: timer, message, signal, conditional, error, escalation, terminate, cancel, compensation, link, and multiple definitions on one event
@@ -95,6 +96,28 @@ const model: ProcessModel = {
 const xml = await convert(model);
 // → formatted BPMN 2.0 XML string
 ```
+
+## Import existing BPMN XML
+
+`importBpmn` parses BPMN XML into the part of `ProcessModel` the library can currently represent. It does **not** promise a lossless XML → JSON → XML round trip. Keep `sourceXml` as the authoritative original; unknown elements and unsupported metadata remain there, not in `model`.
+
+```typescript
+import { readFile } from "node:fs/promises";
+import { convert, importBpmn } from "json-to-bpmn-xml";
+
+const originalXml = await readFile("./invoice.bpmn", "utf8");
+const { model, warnings, sourceXml } = await importBpmn(originalXml);
+
+// Save sourceXml if the original diagram/engine extensions must be preserved.
+for (const warning of warnings) console.warn(warning.code, warning.elementId, warning.message);
+
+if (model) {
+  // Only use this if a newly laid-out diagram with supported BPMN content is acceptable.
+  const regeneratedXml = await convert(model);
+}
+```
+
+Unsupported nodes and sequence/message flows connected to them are omitted together; each omission is reported. If no process can be represented, or the partial JSON cannot be regenerated, `model` is `null` while `sourceXml` remains intact. Malformed XML rejects with a parse error. `npm run preview` checks both `fixtures/models/` and `fixtures/xml/`, writing separate `json-to-bpmn/` and `bpmn-to-json/` result folders. See [import guide](./docs/bpmn-import.md) and [unsupported-node fixture](./fixtures/xml/unsupported-ad-hoc.bpmn).
 
 Without lanes, the diagram plane is bound to the **process** (no collaboration).
 

@@ -1,28 +1,30 @@
 /**
- * Render all fixture models to BPMN XML + PNG previews.
+ * Render model fixtures and import BPMN XML fixtures.
  *
  * Usage:
  *   npm run preview
  *
  * Output:
- *   previews/YYYY-MM-DD_HH-mm-ss/<fixture>.bpmn
- *   previews/YYYY-MM-DD_HH-mm-ss/<fixture>.png
+ *   previews/YYYY-MM-DD_HH-mm-ss/json-to-bpmn/<fixture>.bpmn/.png
+ *   previews/YYYY-MM-DD_HH-mm-ss/bpmn-to-json/<fixture>.source.bpmn/.json/.bpmn/.png
  *
  * PNG framing (white background + padding) is applied after render —
  * conversion / layout logic is untouched.
  */
-import { mkdir, writeFile, readFile, stat, access } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, stat, access } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { styleText } from "node:util";
-import { convertAll } from "bpmn-to-image";
-import puppeteer from "puppeteer";
-import { convert, type ProcessModel } from "../src/index";
+import type { convertAll as ConvertAll } from "bpmn-to-image";
+import type Puppeteer from "puppeteer";
+import { convert, importBpmn, type ProcessModel } from "../src/index";
 import * as fixtureExports from "../fixtures/models";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PREVIEWS_ROOT = path.join(ROOT, "previews");
+const XML_FIXTURES_ROOT = path.join(ROOT, "fixtures/xml");
+let puppeteer: typeof Puppeteer;
 
 /** White margin around the diagram PNG (CSS px). No artificial border. */
 const FRAME_PADDING_PX = 56;
@@ -62,6 +64,11 @@ function collectFixtures(): FixtureEntry[] {
     .filter((entry): entry is [string, ProcessModel] => isProcessModel(entry[1]))
     .map(([name, model]) => ({ name, model }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function collectXmlFixtures(): Promise<string[]> {
+  const files = await readdir(XML_FIXTURES_ROOT);
+  return files.filter((file) => /\.(bpmn|xml)$/i.test(file)).sort();
 }
 
 function stampFolderName(date = new Date()): string {
@@ -121,23 +128,20 @@ async function pathExists(filePath: string): Promise<boolean> {
  * Prefers env → bundled Chrome → system Chrome → auto-install.
  */
 async function ensureChrome(): Promise<string> {
-  const bundled = (() => {
-    try {
-      return puppeteer.executablePath();
-    } catch {
-      return null;
-    }
-  })();
-
   const candidates = [
     process.env.PUPPETEER_EXECUTABLE_PATH,
-    bundled,
     ...SYSTEM_CHROME_CANDIDATES,
   ].filter((p): p is string => !!p);
 
   for (const candidate of candidates) {
     if (await pathExists(candidate)) return candidate;
   }
+
+  // Importing Puppeteer freezes its executable configuration. Prefer a known
+  // system path before importing it, so bpmn-to-image sees that same path.
+  puppeteer = (await import("puppeteer")).default;
+  const bundled = puppeteer.executablePath();
+  if (await pathExists(bundled)) return bundled;
 
   console.log(
     `  ${ansi.step("Chrome missing")} — installing Puppeteer browser…`,
@@ -251,6 +255,7 @@ async function renderOne(
   outDir: string,
   index: number,
   total: number,
+  convertAll: typeof ConvertAll,
 ): Promise<{ bpmn: string; png: string }> {
   const label = `[${index + 1}/${total}]`;
   console.log();
@@ -298,13 +303,59 @@ async function renderOne(
   return { bpmn: bpmnPath, png: pngPath };
 }
 
+async function renderXmlImport(
+  file: string,
+  outDir: string,
+  index: number,
+  total: number,
+  convertAll: typeof ConvertAll,
+): Promise<void> {
+  const name = path.basename(file, path.extname(file));
+  console.log();
+  console.log(`  ${ansi.step("▶")} ${ansi.dim(`[${index + 1}/${total}]`)} ${ansi.name(file)} ${ansi.dim("BPMN → JSON")}`);
+  const sourceXml = await readFile(path.join(XML_FIXTURES_ROOT, file), "utf8");
+  const result = await importBpmn(sourceXml);
+  const sourcePath = path.join(outDir, `${name}.source.bpmn`);
+  const jsonPath = path.join(outDir, `${name}.json`);
+  await writeFile(sourcePath, result.sourceXml, "utf8");
+  await writeFile(jsonPath, JSON.stringify({ model: result.model, warnings: result.warnings }, null, 2) + "\n", "utf8");
+  console.log(`    ${ansi.dim("├─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(sourcePath))} and ${ansi.path(path.basename(jsonPath))}`);
+  console.log(`    ${ansi.dim("├─")} ${ansi.step("warnings:")} ${result.warnings.length}`);
+  if (!result.model) {
+    console.log(`    ${ansi.dim("└─")} ${ansi.step("no supported JSON model; source preserved")}`);
+    return;
+  }
+
+  const regeneratedXml = await convert(result.model);
+  const bpmnPath = path.join(outDir, `${name}.bpmn`);
+  const pngPath = path.join(outDir, `${name}.png`);
+  await writeFile(bpmnPath, regeneratedXml, "utf8");
+  console.log(`    ${ansi.dim("├─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(bpmnPath))}`);
+  console.log(`    ${ansi.dim("├─")} ${ansi.step("BPMN → PNG")} …`);
+  await withQuietConsole(() => convertAll([{ input: bpmnPath, outputs: [pngPath] }], {
+    footer: false,
+    title: false,
+    deviceScaleFactor: 2,
+  }));
+  await framePngOnWhiteCard(pngPath);
+  console.log(`    ${ansi.dim("└─")} ${ansi.ok("✓")} saved ${ansi.path(path.basename(pngPath))} ${ansi.dim(`(${await fileSize(pngPath)})`)}`);
+}
+
 async function main() {
   const chromePath = await ensureChrome();
   process.env.PUPPETEER_EXECUTABLE_PATH = chromePath;
+  puppeteer ??= (await import("puppeteer")).default;
+  // bpmn-to-image initializes Puppeteer at import time, so load it only after
+  // the executable path is known (especially when using system Chrome).
+  const { convertAll } = await import("bpmn-to-image");
 
   const fixtures = collectFixtures();
+  const xmlFixtures = await collectXmlFixtures();
   const stamp = stampFolderName();
   const outDir = path.join(PREVIEWS_ROOT, stamp);
+  const modelOutDir = path.join(outDir, "json-to-bpmn");
+  const importOutDir = path.join(outDir, "bpmn-to-json");
+  const total = fixtures.length + xmlFixtures.length;
 
   console.log();
   console.log(ansi.title(`  ╔${line("═")}╗`));
@@ -313,7 +364,7 @@ async function main() {
   );
   console.log(ansi.title(`  ╚${line("═")}╝`));
   console.log();
-  console.log(`  ${ansi.dim("fixtures:")} ${ansi.ok(String(fixtures.length))}`);
+  console.log(`  ${ansi.dim("fixtures:")} ${ansi.ok(`${fixtures.length} models + ${xmlFixtures.length} XML`)}`);
   console.log(
     `  ${ansi.dim("output:  ")} ${ansi.path(path.relative(ROOT, outDir))}`,
   );
@@ -323,13 +374,14 @@ async function main() {
   console.log(`  ${ansi.dim("chrome:  ")} ${ansi.path(chromePath)}`);
   console.log(`  ${ansi.dim(line())}`);
 
-  if (fixtures.length === 0) {
-    console.log(ansi.fail("  No ProcessModel fixtures found."));
+  if (total === 0) {
+    console.log(ansi.fail("  No model or XML fixtures found."));
     process.exitCode = 1;
     return;
   }
 
-  await mkdir(outDir, { recursive: true });
+  await mkdir(modelOutDir, { recursive: true });
+  await mkdir(importOutDir, { recursive: true });
 
   const started = Date.now();
   const ok: string[] = [];
@@ -338,17 +390,30 @@ async function main() {
   for (let i = 0; i < fixtures.length; i++) {
     const entry = fixtures[i]!;
     try {
-      await renderOne(entry, outDir, i, fixtures.length);
-      ok.push(entry.name);
+      await renderOne(entry, modelOutDir, i, total, convertAll);
+      ok.push(`model:${entry.name}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      failed.push({ name: entry.name, error: message });
+      failed.push({ name: `model:${entry.name}`, error: message });
       console.log(`    ${ansi.fail("✗")} ${ansi.fail(message)}`);
     }
 
     console.log(
-      `  ${ansi.dim("progress")} ${progressBar(i + 1, fixtures.length)}`,
+      `  ${ansi.dim("progress")} ${progressBar(i + 1, total)}`,
     );
+  }
+
+  for (let i = 0; i < xmlFixtures.length; i++) {
+    const file = xmlFixtures[i]!;
+    try {
+      await renderXmlImport(file, importOutDir, fixtures.length + i, total, convertAll);
+      ok.push(`xml:${file}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failed.push({ name: `xml:${file}`, error: message });
+      console.log(`    ${ansi.fail("✗")} ${ansi.fail(message)}`);
+    }
+    console.log(`  ${ansi.dim("progress")} ${progressBar(fixtures.length + i + 1, total)}`);
   }
 
   const sec = ((Date.now() - started) / 1000).toFixed(1);
