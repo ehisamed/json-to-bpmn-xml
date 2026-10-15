@@ -24,10 +24,8 @@ describe("preview reverse-import coverage", () => {
     const report = buildCoverageReport(cases);
     expect(report.total).toBe(40);
     expect(report.importable).toBe(40);
-    expect(report.gaps.map((group) => group.feature)).toEqual(expect.arrayContaining([
-      "DataStoreReference", "DataObjectReference", "TextAnnotation", "Group",
-      "Association", "AdHocSubProcess", "Empty/collapsed SubProcess", "Data input/output associations",
-    ]));
+    expect(report.gaps.map((group) => group.feature)).toEqual(["AdHocSubProcess"]);
+    expect(report.withGaps).toBe(1);
     expect(report.gaps.some((group) => group.feature === "BPMNDI layout regenerated")).toBe(false);
     expect(report.dependentLosses[0]?.feature).toBe("Dependent sequence/message flows");
     expect(coverageMarkdown(report)).toContain("accountsPayable.bpmn | model");

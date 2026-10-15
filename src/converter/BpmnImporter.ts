@@ -10,6 +10,7 @@ type Element = {
   name?: string;
   [key: string]: any;
 };
+type DataKind = "store" | "object";
 
 export interface ImportWarning {
   code: "parse" | "unsupported" | "dropped-flow" | "missing-reference" | "diagram-rebuilt" | "conversion-failed";
@@ -143,6 +144,38 @@ export class BpmnImporter {
     }
 
     const participants = ((collaboration?.participants ?? []) as Element[]);
+    const dataKindById = new Map<string, DataKind>();
+    for (const process of processElements) {
+      for (const element of (process.flowElements ?? []) as Element[]) {
+        const kind: DataKind | undefined = element.$type === "bpmn:DataStoreReference" ? "store"
+          : element.$type === "bpmn:DataObjectReference" ? "object" : undefined;
+        if (!kind) continue;
+        if (!element.id) {
+          warn("unsupported", `${element.$type} without id was skipped`);
+          continue;
+        }
+        if (dataKindById.has(element.id)) {
+          warn("unsupported", `Duplicate data reference ${element.id} was skipped`, element.id);
+          continue;
+        }
+        dataKindById.set(element.id, kind);
+        if (kind === "store") {
+          (model.dataStores ??= []).push({
+            id: element.id,
+            ...(element.name !== undefined ? { name: element.name } : {}),
+          });
+        } else {
+          (model.dataObjects ??= []).push({
+            id: element.id,
+            ...(element.name !== undefined ? { name: element.name } : {}),
+            ...(element.isCollection !== undefined ? { isCollection: element.isCollection === true } : {}),
+          });
+        }
+        if (element.extensionElements || (element.$attrs && Object.keys(element.$attrs).length)) {
+          warn("unsupported", "Data reference extensions are retained only in sourceXml", element.id);
+        }
+      }
+    }
     const processModels: IProcessDef[] = [];
     const importedNodeIds = new Set<string>();
     for (const process of processElements) {
@@ -151,7 +184,7 @@ export class BpmnImporter {
         continue;
       }
       const participant = participants.find((item) => refId(item.processRef) === process.id);
-      const converted = this.importProcess(process, warn, expandedById);
+      const converted = this.importProcess(process, warn, expandedById, dataKindById);
       if (!converted) continue;
       if (participant?.id) converted.participantId = participant.id;
       if (participant?.name !== undefined) converted.participantName = participant.name;
@@ -177,6 +210,62 @@ export class BpmnImporter {
           warn("unsupported", "Participant without an imported process was skipped", participant.id);
         }
       }
+    }
+
+    const artifactIds = new Set<string>();
+    const associations: Element[] = [];
+    for (const process of processElements) {
+      for (const artifact of (process.artifacts ?? []) as Element[]) {
+        if (!artifact.id) {
+          warn("unsupported", `Artifact ${artifact.$type} without id was skipped`);
+          continue;
+        }
+        if (artifact.$type === "bpmn:Association") {
+          associations.push(artifact);
+          continue;
+        }
+        if (artifactIds.has(artifact.id) || dataKindById.has(artifact.id)) {
+          warn("unsupported", "Duplicate artifact id was skipped", artifact.id);
+          continue;
+        }
+        if (artifact.$type === "bpmn:TextAnnotation") {
+          (model.textAnnotations ??= []).push({ id: artifact.id, text: String(artifact.text ?? "") });
+        } else if (artifact.$type === "bpmn:Group") {
+          (model.groups ??= []).push({ id: artifact.id });
+          if (artifact.categoryValueRef) {
+            warn("unsupported", "Group categoryValueRef is retained only in sourceXml", artifact.id);
+          }
+        } else {
+          warn("unsupported", `Artifact ${artifact.$type} is retained only in sourceXml`, artifact.id);
+          continue;
+        }
+        artifactIds.add(artifact.id);
+        if (process !== processElements[0]) {
+          warn("unsupported", "Artifact process placement is not represented in JSON", artifact.id);
+        }
+        if (artifact.extensionElements || (artifact.$attrs && Object.keys(artifact.$attrs).length)) {
+          warn("unsupported", "Artifact extensions are retained only in sourceXml", artifact.id);
+        }
+      }
+    }
+    const associationEndpoints = new Set([...importedNodeIds, ...artifactIds]);
+    for (const association of associations) {
+      const source = refId(association.sourceRef);
+      const target = refId(association.targetRef);
+      if (!association.id || !source || !target || !associationEndpoints.has(source) || !associationEndpoints.has(target)) {
+        warn("missing-reference", "Association references an unsupported or missing node/artifact", association.id);
+        continue;
+      }
+      if (association.associationDirection && !["None", "One", "Both"].includes(association.associationDirection)) {
+        warn("unsupported", "Association direction is retained only in sourceXml", association.id);
+      }
+      (model.associations ??= []).push({
+        id: association.id,
+        source,
+        target,
+        ...(["None", "One", "Both"].includes(association.associationDirection)
+          ? { associationDirection: association.associationDirection } : {}),
+      });
     }
 
     if (processModels.length === 0) {
@@ -210,8 +299,9 @@ export class BpmnImporter {
     process: Element,
     warn: (code: ImportWarning["code"], message: string, elementId?: string) => void,
     expandedById: Map<string, boolean>,
+    dataKindById: Map<string, DataKind>,
   ): IProcessDef | null {
-    const scope = this.importFlowElements((process.flowElements ?? []) as Element[], warn, expandedById);
+    const scope = this.importFlowElements((process.flowElements ?? []) as Element[], warn, expandedById, dataKindById, true);
     if (!scope.nodes.length) {
       warn("unsupported", "Process has no supported nodes and was skipped", process.id);
       return null;
@@ -233,9 +323,6 @@ export class BpmnImporter {
       }
       if (lane.childLaneSet) warn("unsupported", "Nested lane sets are retained only in sourceXml", lane.id);
     }
-    for (const artifact of (process.artifacts ?? []) as Element[]) {
-      warn("unsupported", `Artifact ${artifact.$type} is retained only in sourceXml`, artifact.id);
-    }
     return result;
   }
 
@@ -243,6 +330,8 @@ export class BpmnImporter {
     elements: Element[],
     warn: (code: ImportWarning["code"], message: string, elementId?: string) => void,
     expandedById: Map<string, boolean>,
+    dataKindById: Map<string, DataKind>,
+    importDataAssociations: boolean,
   ): { nodes: INode[]; edges: IEdge[] } {
     const nodes: INode[] = [];
     const flows: Element[] = [];
@@ -251,7 +340,13 @@ export class BpmnImporter {
         flows.push(element);
         continue;
       }
-      const node = this.importNode(element, warn, expandedById);
+      if (element.$type === "bpmn:DataStoreReference" || element.$type === "bpmn:DataObjectReference") {
+        if (!importDataAssociations) {
+          warn("unsupported", "Nested data reference is retained only in sourceXml", element.id);
+        }
+        continue;
+      }
+      const node = this.importNode(element, warn, expandedById, dataKindById, importDataAssociations);
       if (node) nodes.push(node);
       else warn("unsupported", `Element ${element.$type} is retained only in sourceXml`, element.id);
     }
@@ -291,6 +386,8 @@ export class BpmnImporter {
     element: Element,
     warn: (code: ImportWarning["code"], message: string, elementId?: string) => void,
     expandedById: Map<string, boolean>,
+    dataKindById: Map<string, DataKind>,
+    importDataAssociations: boolean,
   ): INode | null {
     const type = NODE_TYPES[element.$type];
     if (!type || !element.id) return null;
@@ -305,8 +402,9 @@ export class BpmnImporter {
     if (element.$attrs && Object.keys(element.$attrs).length) {
       warn("unsupported", "Node vendor attributes are retained only in sourceXml", element.id);
     }
-    if (element.dataInputAssociations?.length || element.dataOutputAssociations?.length) {
-      warn("unsupported", "Activity data input/output associations are retained only in sourceXml", element.id);
+    if (importDataAssociations) this.importDataAssociations(element, node, dataKindById, warn);
+    else if (element.dataInputAssociations?.length || element.dataOutputAssociations?.length) {
+      warn("unsupported", "Nested activity data associations are retained only in sourceXml", element.id);
     }
     if (type === "boundaryEvent") {
       const attachedTo = refId(element.attachedToRef);
@@ -371,10 +469,14 @@ export class BpmnImporter {
       }
     }
     if (type === "subProcess") {
-      const nested = this.importFlowElements((element.flowElements ?? []) as Element[], warn, expandedById);
+      const nestedElements = (element.flowElements ?? []) as Element[];
+      const nested = this.importFlowElements(nestedElements, warn, expandedById, dataKindById, false);
       if (!nested.nodes.length) {
-        warn("unsupported", "Empty or unsupported subprocess was skipped", element.id);
-        return null;
+        if (nestedElements.length) warn("unsupported", "Subprocess body has no supported nodes; only its outer node was imported", element.id);
+        if (element.triggeredByEvent || element.$type === "bpmn:Transaction") {
+          warn("unsupported", "Empty event/transaction subprocess specialization is retained only in sourceXml", element.id);
+        }
+        return node;
       }
       node.subProcess = {
         nodes: nested.nodes,
@@ -391,6 +493,49 @@ export class BpmnImporter {
       }
     }
     return node;
+  }
+
+  private importDataAssociations(
+    element: Element,
+    node: INode,
+    dataKindById: Map<string, DataKind>,
+    warn: (code: ImportWarning["code"], message: string, elementId?: string) => void,
+  ): void {
+    for (const association of (element.dataInputAssociations ?? []) as Element[]) {
+      const sources = (association.sourceRef ?? []) as unknown[];
+      if (sources.length !== 1) {
+        warn("unsupported", "Data input association requires exactly one source in JSON", association.id ?? element.id);
+        continue;
+      }
+      const source = refId(sources[0]);
+      const kind = source ? dataKindById.get(source) : undefined;
+      if (!source || !kind) {
+        warn("missing-reference", "Data input association source is not an imported data reference", association.id ?? element.id);
+        continue;
+      }
+      const target = association.targetRef as Element | undefined;
+      if (target?.$type !== "bpmn:Property" || !["__targetRef_placeholder", "__dataObject_targetRef_placeholder"].includes(target.name ?? "")) {
+        warn("unsupported", "Data input target is not represented in JSON; only the source reference was imported", association.id ?? element.id);
+      }
+      if (association.assignment?.length || association.transformation) {
+        warn("unsupported", "Data input transformation or assignment is retained only in sourceXml", association.id ?? element.id);
+      }
+      const refs = kind === "store" ? (node.dataInputs ??= []) : (node.dataObjectInputs ??= []);
+      if (!refs.includes(source)) refs.push(source);
+    }
+    for (const association of (element.dataOutputAssociations ?? []) as Element[]) {
+      const target = refId(association.targetRef);
+      const kind = target ? dataKindById.get(target) : undefined;
+      if (!target || !kind) {
+        warn("missing-reference", "Data output association target is not an imported data reference", association.id ?? element.id);
+        continue;
+      }
+      if (association.sourceRef?.length || association.assignment?.length || association.transformation) {
+        warn("unsupported", "Data output source, transformation or assignment is retained only in sourceXml", association.id ?? element.id);
+      }
+      const refs = kind === "store" ? (node.dataOutputs ??= []) : (node.dataObjectOutputs ??= []);
+      if (!refs.includes(target)) refs.push(target);
+    }
   }
 
   private importEventOptions(definition: Element, type: EventDefinition): EventDefinitionOptions {

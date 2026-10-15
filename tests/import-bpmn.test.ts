@@ -4,6 +4,10 @@ import { convert, importBpmn } from "../src/index";
 import * as fixtureExports from "../fixtures/models";
 import { messageSignalReferences } from "../fixtures/models/message-signal-references";
 import { advancedSubprocesses } from "../fixtures/models/advanced-subprocesses";
+import { accountsPayable } from "../fixtures/models/accounts-payable";
+import { dataObjects } from "../fixtures/models/data-objects";
+import { artifacts } from "../fixtures/models/artifacts";
+import { subprocessAndMultiInstance } from "../fixtures/models/subprocess-and-multi-instance";
 import type { ProcessModel } from "../src/types/process";
 
 function isProcessModel(value: unknown): value is ProcessModel {
@@ -21,6 +25,7 @@ describe("BPMN XML import", () => {
       expect(result.sourceXml).toBe(xml);
       expect(result.model).not.toBeNull();
       expect(result.warnings.filter((warning) => warning.code === "parse")).toEqual([]);
+      expect(result.warnings.filter((warning) => warning.code !== "diagram-rebuilt")).toEqual([]);
       await expect(convert(result.model!)).resolves.toContain("<bpmn:definitions");
     });
   }
@@ -71,5 +76,44 @@ describe("BPMN XML import", () => {
     expect(recovery?.subProcess?.subProcessType).toBe("event");
     expect(recovery?.subProcess?.expanded).toBe(true);
     expect(recovery?.subProcess?.interrupting).toBe(false);
+  });
+
+  it("keeps empty subprocess nodes and their connected sequence flows", async () => {
+    const result = await importBpmn(await convert(subprocessAndMultiInstance));
+    expect(result.model?.nodes?.find((node) => node.id === "Sub_Notify")).toMatchObject({ type: "subProcess" });
+    expect(result.model?.nodes?.find((node) => node.id === "Sub_Notify")?.subProcess).toBeUndefined();
+    expect(result.model?.edges).toHaveLength(subprocessAndMultiInstance.edges!.length);
+  });
+
+  it("restores data-store and data-object associations", async () => {
+    const storeResult = await importBpmn(await convert(accountsPayable));
+    expect(storeResult.model?.dataStores).toEqual([{ id: "DataStoreReference_05gbcij", name: "Due Invoices DB" }]);
+    const storeNodes = storeResult.model?.processes?.flatMap((process) => process.nodes) ?? [];
+    expect(storeNodes.find((node) => node.id === "Activity_0zmoiys")?.dataOutputs).toEqual(["DataStoreReference_05gbcij"]);
+    const objectResult = await importBpmn(await convert(dataObjects));
+    expect(objectResult.model?.dataObjects).toEqual(dataObjects.dataObjects);
+    expect(objectResult.model?.nodes?.find((node) => node.id === "Validate")?.dataObjectInputs).toEqual(["InvoiceDocument"]);
+    expect(objectResult.model?.nodes?.find((node) => node.id === "Validate")?.dataObjectOutputs).toEqual(["ValidatedInvoice"]);
+  });
+
+  it("restores annotations, groups and associations", async () => {
+    const result = await importBpmn(await convert(artifacts));
+    expect(result.model?.textAnnotations).toEqual(artifacts.textAnnotations);
+    expect(result.model?.groups).toEqual([{ id: "Group_Review" }]);
+    expect(result.model?.associations).toEqual(artifacts.associations);
+  });
+
+  it("warns about a multi-source data mapping without changing the source XML", async () => {
+    const xml = (await convert(dataObjects)).replace(
+      "<bpmn:sourceRef>InvoiceDocument</bpmn:sourceRef>",
+      "<bpmn:sourceRef>InvoiceDocument</bpmn:sourceRef><bpmn:sourceRef>ValidatedInvoice</bpmn:sourceRef>",
+    );
+    const result = await importBpmn(xml);
+    expect(result.sourceXml).toBe(xml);
+    expect(result.model?.nodes?.find((node) => node.id === "Validate")?.dataObjectInputs).toBeUndefined();
+    expect(result.warnings).toContainEqual(expect.objectContaining({
+      code: "unsupported", elementId: "DataObjectInput_Validate_InvoiceDocument",
+    }));
+    await expect(convert(result.model!)).resolves.toContain("<bpmn:definitions");
   });
 });
